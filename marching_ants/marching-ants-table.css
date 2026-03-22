@@ -109,6 +109,7 @@ table {
   table-layout: fixed;
 }
 
+td { cursor: pointer; }
 td, th {
   height: 36px;
   text-align: center;

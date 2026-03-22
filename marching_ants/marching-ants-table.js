@@ -76,8 +76,14 @@ function onResizeStart(e) {
 
 /* ── Selection ── */
 
+let hasSelection = true;
+
 function applySelection() {
   document.querySelectorAll('td').forEach(td => td.classList.remove('selected'));
+  if (!hasSelection) {
+    document.getElementById('info-text').innerHTML = 'No selection';
+    return;
+  }
   for (let r = startR; r < startR + SEL; r++)
     for (let c = startC; c < startC + SEL; c++)
       document.getElementById(`c${r}_${c}`).classList.add('selected');
@@ -146,6 +152,8 @@ function drawMarch(ts) {
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, tblRect.width, tblRect.height);
 
+  if (!hasSelection) { rafId = requestAnimationFrame(drawMarch); return; }
+
   const { x, y, w, h } = getSelectionRect();
   const dash = 8, gap = 8;
 
@@ -163,15 +171,33 @@ function drawMarch(ts) {
 
 /* ── Init ── */
 
+function clearSelection() {
+  hasSelection = false;
+  applySelection();
+}
+
 function randomize() {
+  hasSelection = true;
   startR = Math.floor(Math.random() * (ROWS - SEL + 1));
   startC = Math.floor(Math.random() * (COLS - SEL + 1));
   applySelection();
 }
 
 document.getElementById('c-color').addEventListener('input', e => { color = e.target.value; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') clearSelection(); });
 
 buildTable();
+
+document.getElementById('tbl').querySelector('tbody').addEventListener('click', e => {
+  const td = e.target.closest('td');
+  if (!td) return;
+  const [, r, c] = td.id.match(/^c(\d+)_(\d+)$/);
+  hasSelection = true;
+  startR = Math.min(parseInt(r), ROWS - SEL);
+  startC = Math.min(parseInt(c), COLS - SEL);
+  applySelection();
+});
+
 randomize();
 lastTime = null;
 requestAnimationFrame(drawMarch);
