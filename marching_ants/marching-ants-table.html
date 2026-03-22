@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marching Ants Table</title>
+<link rel="stylesheet" href="marching-ants-table.css">
+</head>
+<body>
+<div class="card">
+  <h1>Marching ants — table selection</h1>
+
+  <div class="controls">
+    <button onclick="randomize()">Randomize selection</button>
+    <div class="ctrl-group">
+      <label>Color</label>
+      <input type="color" id="c-color" value="#378ADD">
+    </div>
+    <div class="ctrl-group">
+      <label>Speed</label>
+      <input type="range" id="c-speed" min="10" max="120" step="5" value="40">
+    </div>
+  </div>
+
+  <p class="hint">Drag any column header edge to resize it.</p>
+  <p class="info" id="info-text"></p>
+
+  <div class="tbl-container" id="container">
+    <table id="tbl"></table>
+    <canvas id="cvs"></canvas>
+  </div>
+</div>
+
+<script src="marching-ants-table.js"></script>
+</body>
+</html>
