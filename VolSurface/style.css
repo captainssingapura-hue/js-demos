@@ -1,0 +1,278 @@
+/* FX Volatility Surface Display — styles.css */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0d0d14;
+  --bg-panel: #13131f;
+  --bg-card: #1a1a2e;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.18);
+  --text-primary: #e8e8f0;
+  --text-secondary: #8888aa;
+  --text-hint: rgba(255, 255, 255, 0.3);
+  --accent: #4a9eff;
+  --accent-bg: rgba(74, 158, 255, 0.12);
+  --accent-border: rgba(74, 158, 255, 0.35);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text-primary);
+  min-height: 100vh;
+  padding: 24px;
+}
+
+/* ── Header ─────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.header-title {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.header-pair {
+  font-size: 28px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.header-note {
+  font-size: 11px;
+  color: var(--text-hint);
+  align-self: flex-end;
+  padding-bottom: 4px;
+}
+
+/* ── Controls bar ────────────────────────────────── */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.pair-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pair-btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  letter-spacing: 0.04em;
+}
+
+.pair-btn:hover {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.pair-btn.active {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.controls-right {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-label input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+select {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--border-hover);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+select:hover, select:focus {
+  border-color: var(--accent-border);
+}
+
+/* ── Stat cards ──────────────────────────────────── */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  transition: border-color 0.15s;
+}
+
+.stat-card:hover {
+  border-color: var(--border-hover);
+}
+
+.stat-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+/* ── Canvas container ────────────────────────────── */
+.canvas-wrap {
+  width: 100%;
+  height: 460px;
+  border-radius: var(--radius-lg);
+  border: 0.5px solid var(--border);
+  overflow: hidden;
+  background: var(--bg);
+  position: relative;
+  margin-bottom: 12px;
+}
+
+canvas#vol-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Tooltip ─────────────────────────────────────── */
+#tooltip {
+  position: absolute;
+  display: none;
+  background: rgba(10, 10, 20, 0.94);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+  line-height: 1.7;
+  z-index: 10;
+  border: 0.5px solid var(--border-hover);
+}
+
+#tooltip b {
+  color: var(--accent);
+}
+
+/* ── Axes hint ───────────────────────────────────── */
+.axes-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 14px;
+  font-size: 11px;
+  color: var(--text-hint);
+  pointer-events: none;
+  font-family: var(--font-mono);
+}
+
+/* ── Legend row ──────────────────────────────────── */
+.legend-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+canvas#legend-canvas {
+  border-radius: 3px;
+  display: block;
+}
+
+.legend-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.legend-note {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-hint);
+}
+
+/* ── Responsive ──────────────────────────────────── */
+@media (max-width: 640px) {
+  body { padding: 14px; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .canvas-wrap { height: 320px; }
+  .header-pair { font-size: 22px; }
+  .controls-right { margin-left: 0; }
+}
