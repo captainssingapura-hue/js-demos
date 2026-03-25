@@ -1,110 +1,190 @@
 /* demo.js — FX Volatility Surface demo
-   Wires the VolSurface library to the demo UI.
-   FX pair data lives here, not in the library.
+   Exports createDemo() which builds the entire UI and returns a managed root element.
 */
 
-import { VolSurface } from './vol-surface.js';
+import { VolSurface, COLORMAPS } from './vol-surface.js';
+import { PAIRS, buildVolGrid } from './fx-data.js';
+import { createRandomProvider } from './random-provider.js';
 
-// ── FX pair definitions ────────────────────────────────────────────────────
-const PAIRS = {
-  EURUSD: {
-    label: 'EUR/USD',
-    atm:   [8.2, 8.5, 8.9, 9.4, 10.1],
-    rr:    [-0.4, -0.6, -0.8, -1.0, -1.3],
-    fly:   [0.12, 0.18, 0.22, 0.28, 0.35],
-    skew:  'Negative',
-    slope: 'Upward',
-  },
-  USDJPY: {
-    label: 'USD/JPY',
-    atm:   [7.1, 7.8, 8.6, 9.8, 11.2],
-    rr:    [0.8, 1.1, 1.4, 1.8, 2.3],
-    fly:   [0.20, 0.28, 0.35, 0.45, 0.58],
-    skew:  'Positive',
-    slope: 'Steep Up',
-  },
-  GBPUSD: {
-    label: 'GBP/USD',
-    atm:   [8.8, 9.1, 9.6, 10.3, 11.1],
-    rr:    [-0.6, -0.9, -1.2, -1.5, -1.9],
-    fly:   [0.15, 0.22, 0.30, 0.38, 0.48],
-    skew:  'Negative',
-    slope: 'Upward',
-  },
-  USDCHF: {
-    label: 'USD/CHF',
-    atm:   [6.8, 7.2, 7.7, 8.4, 9.3],
-    rr:    [-0.3, -0.4, -0.5, -0.7, -0.9],
-    fly:   [0.10, 0.14, 0.18, 0.23, 0.30],
-    skew:  'Mild Neg',
-    slope: 'Moderate',
-  },
-};
-
-const TENORS = ['1W', '1M', '3M', '6M', '1Y'];
-const DELTAS = [10, 25, 50, 75, 90];
-
-// ── SVI-style vol computation ─────────────────────────────────────────────
-function computeVol(pair, ti, di) {
-  const atm  = pair.atm[ti];
-  const rr   = pair.rr[ti];
-  const fly  = pair.fly[ti];
-  const moneyness = (DELTAS[di] - 50) / 50;
-  const smile     = fly * moneyness * moneyness;
-  const skewAdj   = -rr * moneyness * 0.5;
-  const jitter    = (Math.sin(ti * 7.3 + di * 13.1) * 0.5 + 0.5) * 0.08 - 0.04;
-  return atm + skewAdj + smile + jitter;
+// ── DOM helpers ──────────────────────────────────────────────────────────
+function el(tag, cls, attrs) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (attrs) Object.entries(attrs).forEach(([k, v]) => {
+    if (k === 'text') e.textContent = v;
+    else e.setAttribute(k, v);
+  });
+  return e;
 }
 
-function buildVolGrid(pairKey) {
-  const pair = PAIRS[pairKey];
-  return {
-    grid:   TENORS.map((_, ti) => DELTAS.map((_, di) => computeVol(pair, ti, di))),
-    tenors: TENORS,
-    deltas: DELTAS,
-    label:  pair.label,
-  };
+function buildHeader() {
+  const header = el('div', 'header');
+  const left   = el('div');
+  left.appendChild(el('div', 'header-title', { text: 'FX Implied Volatility Surface' }));
+  const pair = el('div', 'header-pair', { text: 'EUR/USD' });
+  left.appendChild(pair);
+  header.appendChild(left);
+  header.appendChild(el('div', 'header-note', { text: 'Illustrative SVI-style surface \u00b7 not live data' }));
+  return { header, pairLabel: pair };
 }
 
-// ── Demo init ─────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+function buildControls() {
+  const controls = el('div', 'controls');
+
+  // Pair buttons
+  const pairBtns = el('div', 'pair-buttons');
+  const pairs = [
+    ['EURUSD', 'EUR/USD'],
+    ['USDJPY', 'USD/JPY'],
+    ['GBPUSD', 'GBP/USD'],
+    ['USDCHF', 'USD/CHF'],
+  ];
+  pairs.forEach(([key, label]) => {
+    const btn = el('button', 'pair-btn', { text: label, 'data-pair': key });
+    if (key === 'EURUSD') btn.classList.add('active');
+    pairBtns.appendChild(btn);
+  });
+  controls.appendChild(pairBtns);
+
+  // Right-side controls
+  const right = el('div', 'controls-right');
+
+  // Wireframe toggle
+  const wireLabel = el('label', 'toggle-label');
+  const wireCheck = el('input', null, { type: 'checkbox' });
+  wireLabel.appendChild(wireCheck);
+  wireLabel.appendChild(document.createTextNode(' Wireframe'));
+  right.appendChild(wireLabel);
+
+  // Colormap select
+  const selWrap = el('div', 'select-wrap');
+  selWrap.appendChild(el('span', null, { text: 'Colormap' }));
+  const select = el('select');
+  Object.keys(COLORMAPS).forEach(name => {
+    const opt = el('option', null, { value: name, text: name.charAt(0).toUpperCase() + name.slice(1) });
+    select.appendChild(opt);
+  });
+  selWrap.appendChild(select);
+  right.appendChild(selWrap);
+
+  controls.appendChild(right);
+  return { controls, pairBtns, wireCheck, colormapSelect: select };
+}
+
+function buildStats() {
+  const stats = el('div', 'stats');
+  const cards = [
+    ['ATM 1M',    'stat-atm'],
+    ['25\u0394 RR 1Y', 'stat-rr'],
+    ['Vol Skew',  'stat-skew'],
+    ['Term Slope','stat-slope'],
+  ];
+  const refs = {};
+  cards.forEach(([label, key]) => {
+    const card = el('div', 'stat-card');
+    card.appendChild(el('div', 'stat-label', { text: label }));
+    const val = el('div', 'stat-value', { text: '\u2014' });
+    card.appendChild(val);
+    stats.appendChild(card);
+    refs[key] = val;
+  });
+  return { stats, refs };
+}
+
+function buildCanvas() {
+  const wrap = el('div', 'canvas-wrap');
+  wrap.appendChild(el('div', 'axes-hint', { text: 'Drag to rotate \u00b7 Scroll to zoom \u00b7 Right-drag to pan' }));
+  return wrap;
+}
+
+function buildLegend() {
+  const row = el('div', 'legend-row');
+  row.appendChild(el('span', 'legend-label', { text: 'Low vol \u2192 High vol' }));
+  row.appendChild(el('span', 'legend-note',  { text: 'Three.js r128' }));
+  return row;
+}
+
+// ── Public API ───────────────────────────────────────────────────────────
+
+/**
+ * Create the full demo UI.
+ * @param {object}  options
+ * @param {object}  options.THREE - Three.js namespace
+ * @returns {{ el: HTMLElement, destroy: Function }}
+ */
+export function createDemo({ THREE }) {
+  const root = el('div', 'vol-demo');
+
+  // Build DOM sections
+  const { header, pairLabel }                        = buildHeader();
+  const { controls, pairBtns, wireCheck, colormapSelect } = buildControls();
+  const { stats, refs }                              = buildStats();
+  const canvasWrap                                   = buildCanvas();
+  const legend                                       = buildLegend();
+
+  root.append(header, controls, stats, canvasWrap, legend);
+
+  // VolSurface (needs to be in DOM for clientWidth/Height)
+  let vs       = null;
+  let provider = null;
   let currentPair = 'EURUSD';
 
-  const vs = new VolSurface(document.getElementById('canvas-wrap'), {
-    THREE:    window.THREE,
-    colormap: document.getElementById('colormap-select').value,
-    wireframe: document.getElementById('wireframe-toggle').checked,
-  });
+  function init() {
+    vs = new VolSurface(canvasWrap, {
+      THREE,
+      colormap:  colormapSelect.value,
+      wireframe: wireCheck.checked,
+    });
+
+    provider = createRandomProvider(data => vs.setData(data));
+
+    // Pair buttons
+    pairBtns.addEventListener('click', e => {
+      const btn = e.target.closest('.pair-btn');
+      if (!btn) return;
+      setPair(btn.dataset.pair);
+    });
+
+    wireCheck.addEventListener('change', () => vs.setWireframe(wireCheck.checked));
+    colormapSelect.addEventListener('change', () => vs.setColormap(colormapSelect.value));
+
+    setPair(currentPair);
+  }
 
   function setPair(pairKey) {
     currentPair = pairKey;
-    document.querySelectorAll('.pair-btn').forEach(btn => {
+    const data = buildVolGrid(pairKey);
+    provider.setBaseline(data);
+    pairBtns.querySelectorAll('.pair-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.pair === pairKey);
     });
-    vs.setData(buildVolGrid(pairKey));
     updateStats(pairKey);
   }
 
   function updateStats(pairKey) {
     const p = PAIRS[pairKey];
-    document.getElementById('stat-atm').textContent   = p.atm[1].toFixed(1) + '%';
-    document.getElementById('stat-rr').textContent    = (p.rr[4] >= 0 ? '+' : '') + p.rr[4].toFixed(1) + ' vol';
-    document.getElementById('stat-skew').textContent  = p.skew;
-    document.getElementById('stat-slope').textContent = p.slope;
-    document.getElementById('header-pair').textContent = p.label;
+    refs['stat-atm'].textContent   = p.atm[1].toFixed(1) + '%';
+    refs['stat-rr'].textContent    = (p.rr[4] >= 0 ? '+' : '') + p.rr[4].toFixed(1) + ' vol';
+    refs['stat-skew'].textContent  = p.skew;
+    refs['stat-slope'].textContent = p.slope;
+    pairLabel.textContent          = p.label;
   }
 
-  // Bind UI controls
-  document.querySelectorAll('.pair-btn').forEach(btn => {
-    btn.addEventListener('click', () => setPair(btn.dataset.pair));
+  // Defer init until the root is in the DOM (so container has dimensions)
+  const observer = new MutationObserver(() => {
+    if (root.isConnected) {
+      observer.disconnect();
+      init();
+    }
   });
-  document.getElementById('wireframe-toggle').addEventListener('change', e => {
-    vs.setWireframe(e.target.checked);
-  });
-  document.getElementById('colormap-select').addEventListener('change', e => {
-    vs.setColormap(e.target.value);
-  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
 
-  // Initial render
-  setPair(currentPair);
-});
+  return {
+    el: root,
+    destroy() {
+      observer.disconnect();
+      if (provider) provider.destroy();
+      if (vs) vs.destroy();
+    },
+  };
+}

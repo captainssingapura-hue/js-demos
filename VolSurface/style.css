@@ -198,38 +198,14 @@ select:hover, select:focus {
 .canvas-wrap {
   width: 100%;
   height: 460px;
+  min-height: 200px;
   border-radius: var(--radius-lg);
   border: 0.5px solid var(--border);
   overflow: hidden;
   background: var(--bg);
   position: relative;
   margin-bottom: 12px;
-}
-
-canvas#vol-canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-/* ── Tooltip ─────────────────────────────────────── */
-#tooltip {
-  position: absolute;
-  display: none;
-  background: rgba(10, 10, 20, 0.94);
-  color: var(--text-primary);
-  font-size: 12px;
-  font-family: var(--font-mono);
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  pointer-events: none;
-  line-height: 1.7;
-  z-index: 10;
-  border: 0.5px solid var(--border-hover);
-}
-
-#tooltip b {
-  color: var(--accent);
+  resize: vertical;
 }
 
 /* ── Axes hint ───────────────────────────────────── */
@@ -249,11 +225,6 @@ canvas#vol-canvas {
   gap: 14px;
   align-items: center;
   flex-wrap: wrap;
-}
-
-canvas#legend-canvas {
-  border-radius: 3px;
-  display: block;
 }
 
 .legend-label {
