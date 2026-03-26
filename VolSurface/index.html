@@ -11,77 +11,12 @@
 </head>
 <body>
 
-  <!-- ── Header ─────────────────────────────────────────────────── -->
-  <div class="header">
-    <div>
-      <div class="header-title">FX Implied Volatility Surface</div>
-      <div class="header-pair" id="header-pair">EUR/USD</div>
-    </div>
-    <div class="header-note">Illustrative SVI-style surface · not live data</div>
-  </div>
-
-  <!-- ── Controls ───────────────────────────────────────────────── -->
-  <div class="controls">
-    <div class="pair-buttons">
-      <button class="pair-btn active" data-pair="EURUSD">EUR/USD</button>
-      <button class="pair-btn"        data-pair="USDJPY">USD/JPY</button>
-      <button class="pair-btn"        data-pair="GBPUSD">GBP/USD</button>
-      <button class="pair-btn"        data-pair="USDCHF">USD/CHF</button>
-    </div>
-
-    <div class="controls-right">
-      <label class="toggle-label">
-        <input type="checkbox" id="wireframe-toggle" />
-        Wireframe
-      </label>
-      <div class="select-wrap">
-        <span>Colormap</span>
-        <select id="colormap-select">
-          <option value="plasma">Plasma</option>
-          <option value="viridis">Viridis</option>
-          <option value="rdylgn">RdYlGn</option>
-          <option value="spectral">Spectral</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Stats ──────────────────────────────────────────────────── -->
-  <div class="stats">
-    <div class="stat-card">
-      <div class="stat-label">ATM 1M</div>
-      <div class="stat-value" id="stat-atm">—</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">25Δ RR 1Y</div>
-      <div class="stat-value" id="stat-rr">—</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Vol Skew</div>
-      <div class="stat-value" id="stat-skew">—</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Term Slope</div>
-      <div class="stat-value" id="stat-slope">—</div>
-    </div>
-  </div>
-
-  <!-- ── 3D Canvas ───────────────────────────────────────────────── -->
-  <div class="canvas-wrap" id="canvas-wrap">
-    <div id="tooltip"></div>
-    <div class="axes-hint">Drag to rotate · Scroll to zoom · Right-drag to pan</div>
-  </div>
-
-  <!-- ── Legend ─────────────────────────────────────────────────── -->
-  <div class="legend-row">
-    <canvas id="legend-canvas" width="160" height="12"></canvas>
-    <span class="legend-label">Low vol → High vol</span>
-    <span class="legend-note">Three.js r128</span>
-  </div>
-
-  <!-- ── Scripts ─────────────────────────────────────────────────── -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="main.js"></script>
+  <script type="module">
+    import { createDemo } from './demo.js';
+    const demo = createDemo({ THREE: window.THREE });
+    document.body.appendChild(demo.el);
+  </script>
 
 </body>
 </html>

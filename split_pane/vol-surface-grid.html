@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VolSurface 2×2 Grid — SplitPane + MultiTabPane</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Syne:wght@400;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0d0d14;
+    --surface:  #12121c;
+    --border:   #1e2330;
+    --text:     #c8d0e8;
+    --muted:    #4e566e;
+    --accent:   #5b72b8;
+    --a: #5b72b8; --b: #5bb88a; --c: #b8a05b; --d: #b85b8a;
+    --div-size: 6px;
+  }
+
+  html, body { width:100%; height:100%; overflow:hidden; background:var(--bg); color:var(--text); font-family:'JetBrains Mono',monospace; }
+
+  body.sp-dragging { user-select:none; cursor:col-resize; }
+
+  /* ── Shell ── */
+  #shell { display:flex; flex-direction:column; height:100vh; }
+
+  /* ── Header ── */
+  #header {
+    flex:0 0 auto; height:44px;
+    background:var(--surface); border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:18px; padding:0 20px;
+  }
+  #header .logo { font-family:'Syne',sans-serif; font-weight:800; font-size:15px; letter-spacing:-.02em; }
+  #header .logo em { font-style:normal; color:var(--accent); }
+  #header .badge {
+    font-size:9px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--muted); border:1px solid var(--border); border-radius:3px; padding:2px 7px;
+  }
+  #header .right { margin-left:auto; display:flex; align-items:center; gap:12px; }
+  #header .coords { font-size:10px; color:var(--muted); display:flex; gap:14px; }
+  #header .coords span { color:var(--text); }
+  #reset-btn {
+    background:none; border:1px solid var(--border);
+    color:var(--muted); font-family:inherit; font-size:10px; letter-spacing:.06em;
+    padding:4px 10px; border-radius:3px; cursor:pointer; text-transform:uppercase;
+    transition:border-color .15s, color .15s;
+  }
+  #reset-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* ── Container (split pane root) ── */
+  #container { flex:1 1 0; display:flex; flex-direction:column; overflow:hidden; }
+
+  .sp-row { display:flex; overflow:hidden; flex-shrink:0; }
+
+  /* ── Panes ── */
+  .pane {
+    overflow:hidden; display:flex; flex-direction:column; position:relative;
+    background:var(--bg); min-width:0; min-height:0; height:100%;
+    border:1px solid var(--border);
+  }
+
+  /* ── SplitPane Dividers ── */
+  .sp-div {
+    flex:0 0 var(--div-size);
+    background:var(--border);
+    position:relative; z-index:5;
+    display:flex; align-items:center; justify-content:center;
+    transition:background .15s;
+  }
+  .sp-div-v { width:var(--div-size); cursor:col-resize; }
+  .sp-div-h { height:var(--div-size); cursor:row-resize; width:100%; }
+  .sp-div:hover, .sp-div.sp-active { background:var(--accent); }
+
+  .sp-div-v .grip { display:flex; flex-direction:column; gap:3px; pointer-events:none; opacity:.35; transition:opacity .15s; }
+  .sp-div-h .grip { display:flex; flex-direction:row;    gap:3px; pointer-events:none; opacity:.35; transition:opacity .15s; }
+  .sp-div:hover .grip, .sp-div.sp-active .grip { opacity:.9; }
+  .grip-dot { width:3px; height:3px; border-radius:50%; background:var(--bg); }
+
+  /* ── MultiTabPane ── */
+  .mtp-bar {
+    flex:0 0 auto;
+    display:flex; align-items:stretch;
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+    min-height:32px;
+    position:relative;
+    overflow-x:auto; overflow-y:hidden;
+  }
+  .mtp-bar::-webkit-scrollbar { height:0; }
+
+  .mtp-tab {
+    flex:0 0 auto;
+    display:flex; align-items:center; gap:6px;
+    padding:0 14px;
+    font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--muted);
+    cursor:pointer;
+    border-right:1px solid var(--border);
+    transition:color .12s, background .12s;
+    user-select:none;
+    position:relative;
+  }
+  .mtp-tab:hover { color:var(--text); background:rgba(255,255,255,.03); }
+  .mtp-tab-active {
+    color:var(--text);
+    background:var(--bg);
+    box-shadow:inset 0 -2px 0 var(--accent);
+  }
+  .mtp-tab-dragging { opacity:.35; }
+
+  .mtp-tab-close {
+    font-size:14px; line-height:1;
+    color:var(--muted); cursor:pointer;
+    margin-left:2px;
+    transition:color .12s;
+  }
+  .mtp-tab-close:hover { color:#f06; }
+
+  .mtp-drop-indicator {
+    display:none;
+    position:absolute;
+    top:0; bottom:0; width:2px;
+    background:var(--accent);
+    z-index:10;
+    pointer-events:none;
+  }
+
+  .mtp-ghost {
+    position:fixed; top:-1000px; left:-1000px;
+    pointer-events:none; opacity:.8;
+    background:var(--surface);
+    border:1px solid var(--accent);
+    border-radius:3px; padding:4px 12px;
+    font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--text); font-family:'JetBrains Mono',monospace;
+  }
+
+  .mtp-body {
+    flex:1; position:relative; overflow:hidden;
+  }
+
+  .mtp-panel {
+    display:none;
+    position:absolute; inset:0;
+  }
+  .mtp-panel-active { display:block; }
+
+  /* ── Vol surface containers inside panels ── */
+  .vol-container {
+    width:100%; height:100%;
+    position:relative; overflow:hidden;
+  }
+</style>
+</head>
+<body>
+<div id="shell">
+
+  <!-- Header -->
+  <div id="header">
+    <div class="logo">Vol<em>Surface</em> Grid</div>
+    <div class="badge">2 &times; 2</div>
+    <div class="badge">SplitPane + Tabs</div>
+    <div class="right">
+      <div class="coords">
+        x: <span id="out-x">50.0</span>%
+        y: <span id="out-y">50.0</span>%
+      </div>
+      <button id="reset-btn">reset</button>
+    </div>
+  </div>
+
+  <!-- Root container -->
+  <div id="container">
+
+    <!-- Top row -->
+    <div class="sp-row" id="row-top">
+      <div class="pane" id="pane-tl"></div>
+
+      <div class="sp-div sp-div-v" id="div-v">
+        <div class="grip"><div class="grip-dot"></div><div class="grip-dot"></div><div class="grip-dot"></div></div>
+      </div>
+
+      <div class="pane" id="pane-tr"></div>
+    </div>
+
+    <!-- Horizontal divider -->
+    <div class="sp-div sp-div-h" id="div-h">
+      <div class="grip"><div class="grip-dot"></div><div class="grip-dot"></div><div class="grip-dot"></div></div>
+    </div>
+
+    <!-- Bottom row -->
+    <div class="sp-row" id="row-bot">
+      <div class="pane" id="pane-bl"></div>
+
+      <div class="sp-div sp-div-v" id="div-v2">
+        <div class="grip"><div class="grip-dot"></div><div class="grip-dot"></div><div class="grip-dot"></div></div>
+      </div>
+
+      <div class="pane" id="pane-br"></div>
+    </div>
+
+  </div><!-- /#container -->
+</div><!-- /#shell -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+  import SplitPane    from './SplitPane.js';
+  import MultiTabPane from './MultiTabPane.js';
+  import { VolSurface }        from '../VolSurface/vol-surface.js';
+  import { buildVolGrid }      from '../VolSurface/fx-data.js';
+  import { createRandomProvider } from '../VolSurface/random-provider.js';
+
+  const $ = id => document.getElementById(id);
+
+  // ── Surface registry ────────────────────────────────────────────────────
+  // Track all VolSurface instances so we can resize them on layout change.
+  // Surfaces are created lazily — only when their container is first visible.
+  const surfaces = new Map();  // container element → VolSurface instance
+
+  function ensureSurface(container) {
+    if (surfaces.has(container)) return;
+    const w = container.clientWidth, h = container.clientHeight;
+    if (w === 0 || h === 0) return;       // still hidden — skip
+
+    const pair = container.dataset.pair;
+    const vs = new VolSurface(container, {
+      THREE:       window.THREE,
+      colormap:    'plasma',
+      wireframe:   false,
+      provider:    createRandomProvider,
+      initialData: buildVolGrid(pair),
+    });
+    surfaces.set(container, vs);
+  }
+
+  function resizeAll() {
+    // Lazily init any newly-visible surfaces, then resize existing ones
+    for (const el of Object.values(contentEls)) ensureSurface(el);
+
+    for (const [el, vs] of surfaces) {
+      const w = vs._container.clientWidth;
+      const h = vs._container.clientHeight;
+      if (w === 0 || h === 0) continue;
+      vs._camera.aspect = w / h;
+      vs._camera.updateProjectionMatrix();
+      vs._renderer.setSize(w, h);
+    }
+  }
+
+  // ── Helper: make a vol-surface content element ──────────────────────────
+  function makeVolContent(pair) {
+    const div = document.createElement('div');
+    div.className = 'vol-container';
+    div.dataset.pair = pair;
+    return div;
+  }
+
+  // ── SplitPane ───────────────────────────────────────────────────────────
+  const sp = new SplitPane({
+    container : $('container'),
+    panes: {
+      topLeft     : $('pane-tl'),
+      topRight    : $('pane-tr'),
+      bottomLeft  : $('pane-bl'),
+      bottomRight : $('pane-br'),
+    },
+    dividers: {
+      vertical   : $('div-v'),
+      horizontal : $('div-h'),
+      vertical2  : $('div-v2'),
+    },
+    splitX : 0.5,
+    splitY : 0.5,
+    minPx  : 120,
+    onChange({ splitX, splitY }) {
+      $('out-x').textContent = (splitX * 100).toFixed(1);
+      $('out-y').textContent = (splitY * 100).toFixed(1);
+      setTimeout(resizeAll, 0);
+    },
+  });
+
+  // ── MultiTabPanes (one per quadrant) ────────────────────────────────────
+  const PAIRS = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'NZDUSD', 'USDCAD', 'EURGBP'];
+  const LABELS = {
+    EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY', USDCHF: 'USD/CHF',
+    AUDUSD: 'AUD/USD', NZDUSD: 'NZD/USD', USDCAD: 'USD/CAD', EURGBP: 'EUR/GBP',
+  };
+
+  // Build content elements for each pair
+  const contentEls = {};
+  for (const pair of PAIRS) {
+    contentEls[pair] = makeVolContent(pair);
+  }
+
+  // Distribute 2 tabs per pane
+  const tabPanes = [];
+
+  function makeTabPane(containerId, pairs) {
+    const tp = new MultiTabPane({
+      container: $(containerId),
+      closable:  true,
+      tabs: pairs.map(p => ({ id: p, label: LABELS[p], content: contentEls[p] })),
+      onChange(activeId) {
+        const el = contentEls[activeId];
+        if (el) setTimeout(() => { ensureSurface(el); resizeAll(); }, 50);
+      },
+      onDrop(tabId, from, to) {
+        const el = contentEls[tabId];
+        if (el) setTimeout(() => { ensureSurface(el); resizeAll(); }, 50);
+      },
+    });
+    tabPanes.push(tp);
+    return tp;
+  }
+
+  makeTabPane('pane-tl', ['EURUSD', 'AUDUSD']);
+  makeTabPane('pane-tr', ['GBPUSD', 'NZDUSD']);
+  makeTabPane('pane-bl', ['USDJPY', 'USDCAD']);
+  makeTabPane('pane-br', ['USDCHF', 'EURGBP']);
+
+  // ── Init surfaces for the 4 initially-visible tabs (one rAF for layout) ─
+  // Use setTimeout to ensure layout is computed before creating surfaces
+  setTimeout(() => {
+    for (const el of Object.values(contentEls)) ensureSurface(el);
+    resizeAll();
+  }, 100);
+
+  // ── Reset button ────────────────────────────────────────────────────────
+  $('reset-btn').addEventListener('click', () => {
+    sp.setSplit(0.5, 0.5);
+    $('out-x').textContent = '50.0';
+    $('out-y').textContent = '50.0';
+    requestAnimationFrame(resizeAll);
+  });
+</script>
+</body>
+</html>
