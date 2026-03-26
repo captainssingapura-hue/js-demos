@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SplitPane + MultiTabPane Demo</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #0d0d14;
+    --surface: #12121c;
+    --border:  #1e2330;
+    --text:    #c8d0e8;
+    --muted:   #4e566e;
+    --accent:  #5b72b8;
+    --green:   #3ddc84;
+    --red:     #f04060;
+    --yellow:  #f0c040;
+    --div-size: 6px;
+  }
+
+  html, body { width:100%; height:100%; overflow:hidden; background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; }
+  body.sp-dragging { user-select:none; cursor:col-resize; }
+
+  /* ── Shell ── */
+  #shell { display:flex; flex-direction:column; height:100vh; }
+
+  /* ── Header ── */
+  #header {
+    flex:0 0 auto; height:40px;
+    background:var(--surface); border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:14px; padding:0 16px;
+    font-size:12px;
+  }
+  #header .title { font-weight:700; letter-spacing:-.02em; }
+  #header .title em { font-style:normal; color:var(--accent); }
+  .badge {
+    font-size:9px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--muted); border:1px solid var(--border); border-radius:3px; padding:2px 7px;
+  }
+  .spacer { flex:1; }
+  #header .hint { color:var(--muted); font-size:10px; }
+
+  /* ── Container ── */
+  #container { flex:1 1 0; display:flex; flex-direction:column; overflow:hidden; }
+  .sp-row { display:flex; overflow:hidden; flex-shrink:0; }
+
+  .pane {
+    overflow:hidden; display:flex; flex-direction:column; position:relative;
+    background:var(--bg); min-width:0; min-height:0; height:100%;
+    border:1px solid var(--border);
+  }
+
+  /* ── SplitPane Dividers ── */
+  .sp-div {
+    flex:0 0 var(--div-size); background:var(--border);
+    position:relative; z-index:5;
+    display:flex; align-items:center; justify-content:center;
+    transition:background .15s;
+  }
+  .sp-div-v { width:var(--div-size); cursor:col-resize; }
+  .sp-div-h { height:var(--div-size); cursor:row-resize; width:100%; }
+  .sp-div:hover, .sp-div.sp-active { background:var(--accent); }
+  .sp-div .grip { display:flex; gap:3px; pointer-events:none; opacity:.35; transition:opacity .15s; }
+  .sp-div-v .grip { flex-direction:column; }
+  .sp-div:hover .grip { opacity:.9; }
+  .grip-dot { width:3px; height:3px; border-radius:50%; background:var(--bg); }
+
+  /* ── MultiTabPane ── */
+  .mtp-bar {
+    flex:0 0 auto; display:flex; align-items:stretch;
+    background:var(--surface); border-bottom:1px solid var(--border);
+    min-height:30px; position:relative; overflow-x:auto; overflow-y:hidden;
+  }
+  .mtp-bar::-webkit-scrollbar { height:0; }
+  .mtp-tab {
+    flex:0 0 auto; display:flex; align-items:center; gap:6px;
+    padding:0 12px; font-size:10px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--muted); cursor:pointer; border-right:1px solid var(--border);
+    transition:color .12s, background .12s; user-select:none;
+  }
+  .mtp-tab:hover { color:var(--text); background:rgba(255,255,255,.03); }
+  .mtp-tab-active { color:var(--text); background:var(--bg); box-shadow:inset 0 -2px 0 var(--accent); }
+  .mtp-tab-dragging { opacity:.35; }
+  .mtp-tab-close { font-size:14px; line-height:1; color:var(--muted); cursor:pointer; margin-left:2px; transition:color .12s; }
+  .mtp-tab-close:hover { color:var(--red); }
+  .mtp-drop-indicator { display:none; position:absolute; top:0; bottom:0; width:2px; background:var(--accent); z-index:10; pointer-events:none; }
+  .mtp-ghost { position:fixed; top:-1000px; left:-1000px; pointer-events:none; opacity:.8; background:var(--surface); border:1px solid var(--accent); border-radius:3px; padding:4px 12px; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--text); font-family:inherit; }
+  .mtp-body { flex:1; position:relative; overflow:hidden; }
+  .mtp-panel { display:none; position:absolute; inset:0; }
+  .mtp-panel-active { display:flex; flex-direction:column; }
+
+  /* ── Content panels ── */
+  .panel-content { flex:1; overflow:auto; padding:12px; }
+
+  /* ── Spot Grid ── */
+  .spot-grid { width:100%; border-collapse:collapse; }
+  .spot-grid th {
+    position:sticky; top:0; background:var(--surface); text-align:left;
+    padding:6px 10px; font-size:10px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--muted); border-bottom:1px solid var(--border);
+  }
+  .spot-grid td { padding:5px 10px; border-bottom:1px solid var(--border); font-variant-numeric:tabular-nums; }
+  .spot-grid .pair { font-weight:600; }
+  .spot-grid .bid { color:var(--green); }
+  .spot-grid .ask { color:var(--red); }
+  .spot-grid .spread { color:var(--muted); font-size:11px; }
+  .spot-grid .chg-up { color:var(--green); }
+  .spot-grid .chg-dn { color:var(--red); }
+  .spot-grid tr:hover { background:rgba(91,114,184,.06); }
+
+  /* ── Risk Ladder ── */
+  .risk-ladder { width:100%; border-collapse:collapse; }
+  .risk-ladder th {
+    position:sticky; top:0; background:var(--surface); text-align:right;
+    padding:6px 10px; font-size:10px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--muted); border-bottom:1px solid var(--border);
+  }
+  .risk-ladder th:first-child { text-align:left; }
+  .risk-ladder td { padding:5px 10px; text-align:right; border-bottom:1px solid var(--border); font-variant-numeric:tabular-nums; }
+  .risk-ladder td:first-child { text-align:left; font-weight:600; color:var(--text); }
+  .risk-ladder .pos { color:var(--green); }
+  .risk-ladder .neg { color:var(--red); }
+  .risk-ladder tr:hover { background:rgba(91,114,184,.06); }
+  .risk-ladder tfoot td { font-weight:700; border-top:2px solid var(--border); }
+
+  /* ── Trade Blotter ── */
+  .blotter { width:100%; border-collapse:collapse; }
+  .blotter th {
+    position:sticky; top:0; background:var(--surface); text-align:left;
+    padding:6px 10px; font-size:10px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--muted); border-bottom:1px solid var(--border);
+  }
+  .blotter td { padding:5px 10px; border-bottom:1px solid var(--border); font-variant-numeric:tabular-nums; }
+  .blotter .buy { color:var(--green); }
+  .blotter .sell { color:var(--red); }
+  .blotter .time { color:var(--muted); font-size:11px; }
+  .blotter tr:hover { background:rgba(91,114,184,.06); }
+
+  /* ── PnL Summary ── */
+  .pnl-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; }
+  .pnl-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:6px;
+    padding:14px; display:flex; flex-direction:column; gap:4px;
+  }
+  .pnl-card .label { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+  .pnl-card .value { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .pnl-card .value.pos { color:var(--green); }
+  .pnl-card .value.neg { color:var(--red); }
+  .pnl-card .sub { font-size:10px; color:var(--muted); }
+
+  /* ── Vol Surface container ── */
+  .vol-container { width:100%; height:100%; position:relative; overflow:hidden; }
+
+  /* ── Placeholder ── */
+  .placeholder {
+    flex:1; display:flex; align-items:center; justify-content:center;
+    color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.1em;
+  }
+</style>
+</head>
+<body>
+<div id="shell">
+  <div id="header">
+    <div class="title">Split<em>Pane</em> + MultiTab</div>
+    <div class="badge">demo</div>
+    <div class="badge">drag tabs between panes</div>
+    <div class="spacer"></div>
+    <div class="hint">Drag dividers to resize &middot; Drag tabs to reorder or move</div>
+  </div>
+
+  <div id="container">
+    <div class="sp-row" id="row-top">
+      <div class="pane" id="pane-tl"></div>
+      <div class="sp-div sp-div-v" id="div-v">
+        <div class="grip"><div class="grip-dot"></div><div class="grip-dot"></div><div class="grip-dot"></div></div>
+      </div>
+      <div class="pane" id="pane-tr"></div>
+    </div>
+    <div class="sp-div sp-div-h" id="div-h">
+      <div class="grip"><div class="grip-dot"></div><div class="grip-dot"></div><div class="grip-dot"></div></div>
+    </div>
+    <div class="sp-row" id="row-bot">
+      <div class="pane" id="pane-bl"></div>
+      <div class="sp-div sp-div-v" id="div-v2">
+        <div class="grip"><div class="grip-dot"></div><div class="grip-dot"></div><div class="grip-dot"></div></div>
+      </div>
+      <div class="pane" id="pane-br"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+  import SplitPane    from './SplitPane.js';
+  import MultiTabPane from './MultiTabPane.js';
+  import { VolSurface }          from '../VolSurface/vol-surface.js';
+  import { buildVolGrid }        from '../VolSurface/fx-data.js';
+  import { createRandomProvider } from '../VolSurface/random-provider.js';
+
+  const $ = id => document.getElementById(id);
+
+  // ── Data generators ─────────────────────────────────────────────────────
+
+  const FX = [
+    { pair:'EUR/USD', bid:1.08432, ask:1.08445, chg:0.0012 },
+    { pair:'GBP/USD', bid:1.26310, ask:1.26328, chg:-0.0008 },
+    { pair:'USD/JPY', bid:154.872, ask:154.891, chg:0.234 },
+    { pair:'USD/CHF', bid:0.88120, ask:0.88142, chg:-0.0003 },
+    { pair:'AUD/USD', bid:0.64518, ask:0.64536, chg:0.0015 },
+    { pair:'NZD/USD', bid:0.59720, ask:0.59741, chg:0.0009 },
+    { pair:'USD/CAD', bid:1.36542, ask:1.36568, chg:-0.0021 },
+    { pair:'EUR/GBP', bid:0.85812, ask:0.85834, chg:0.0004 },
+    { pair:'EUR/JPY', bid:167.935, ask:167.962, chg:0.182 },
+    { pair:'GBP/JPY', bid:195.672, ask:195.710, chg:-0.098 },
+  ];
+
+  const RISK = [
+    { tenor:'O/N',  delta:125000, gamma:8200, vega:3100, theta:-1200 },
+    { tenor:'1W',   delta:-89000, gamma:12400, vega:8900, theta:-3400 },
+    { tenor:'1M',   delta:342000, gamma:-15600, vega:22100, theta:-8900 },
+    { tenor:'3M',   delta:-156000, gamma:28900, vega:45200, theta:-18200 },
+    { tenor:'6M',   delta:78000, gamma:-9800, vega:31400, theta:-12600 },
+    { tenor:'1Y',   delta:-215000, gamma:34200, vega:62800, theta:-25100 },
+    { tenor:'2Y',   delta:98000, gamma:-12100, vega:41200, theta:-16500 },
+  ];
+
+  const TRADES = [
+    { time:'15:42:18', pair:'EUR/USD', side:'BUY',  amt:'2.5M', rate:1.08438, status:'Filled' },
+    { time:'15:41:55', pair:'USD/JPY', side:'SELL', amt:'5.0M', rate:154.882, status:'Filled' },
+    { time:'15:40:12', pair:'GBP/USD', side:'BUY',  amt:'1.0M', rate:1.26315, status:'Filled' },
+    { time:'15:38:44', pair:'EUR/JPY', side:'SELL', amt:'3.0M', rate:167.948, status:'Filled' },
+    { time:'15:37:01', pair:'AUD/USD', side:'BUY',  amt:'4.0M', rate:0.64522, status:'Filled' },
+    { time:'15:35:22', pair:'USD/CHF', side:'SELL', amt:'2.0M', rate:0.88135, status:'Partial' },
+    { time:'15:33:18', pair:'USD/CAD', side:'BUY',  amt:'1.5M', rate:1.36555, status:'Filled' },
+    { time:'15:31:45', pair:'NZD/USD', side:'SELL', amt:'3.5M', rate:0.59732, status:'Filled' },
+    { time:'15:29:08', pair:'EUR/GBP', side:'BUY',  amt:'2.0M', rate:0.85820, status:'Filled' },
+    { time:'15:27:33', pair:'GBP/JPY', side:'SELL', amt:'1.0M', rate:195.690, status:'Filled' },
+    { time:'15:25:11', pair:'EUR/USD', side:'SELL', amt:'5.0M', rate:1.08421, status:'Filled' },
+    { time:'15:22:40', pair:'USD/JPY', side:'BUY',  amt:'2.0M', rate:154.865, status:'Filled' },
+  ];
+
+  // ── Content builders ────────────────────────────────────────────────────
+
+  function buildSpotGrid() {
+    const div = document.createElement('div');
+    div.className = 'panel-content';
+    const fmt = (v, d) => v.toFixed(d);
+    div.innerHTML = `<table class="spot-grid">
+      <thead><tr><th>Pair</th><th>Bid</th><th>Ask</th><th>Spread</th><th>Chg</th></tr></thead>
+      <tbody>${FX.map(r => {
+        const d = r.bid > 100 ? 3 : r.bid > 10 ? 3 : 5;
+        const sp = ((r.ask - r.bid) * (r.bid > 100 ? 1000 : 100000)).toFixed(1);
+        const cls = r.chg >= 0 ? 'chg-up' : 'chg-dn';
+        const sign = r.chg >= 0 ? '+' : '';
+        return `<tr>
+          <td class="pair">${r.pair}</td>
+          <td class="bid">${fmt(r.bid, d)}</td>
+          <td class="ask">${fmt(r.ask, d)}</td>
+          <td class="spread">${sp}</td>
+          <td class="${cls}">${sign}${fmt(r.chg, d > 3 ? 4 : 3)}</td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
+    return div;
+  }
+
+  function buildRiskLadder() {
+    const div = document.createElement('div');
+    div.className = 'panel-content';
+    const k = v => { const cls = v >= 0 ? 'pos' : 'neg'; return `<td class="${cls}">${v >= 0 ? '+' : ''}${(v/1000).toFixed(1)}k</td>`; };
+    const totals = RISK.reduce((a, r) => ({ delta: a.delta+r.delta, gamma: a.gamma+r.gamma, vega: a.vega+r.vega, theta: a.theta+r.theta }), { delta:0, gamma:0, vega:0, theta:0 });
+    div.innerHTML = `<table class="risk-ladder">
+      <thead><tr><th>Tenor</th><th>Delta</th><th>Gamma</th><th>Vega</th><th>Theta</th></tr></thead>
+      <tbody>${RISK.map(r => `<tr><td>${r.tenor}</td>${k(r.delta)}${k(r.gamma)}${k(r.vega)}${k(r.theta)}</tr>`).join('')}</tbody>
+      <tfoot><tr><td>Total</td>${k(totals.delta)}${k(totals.gamma)}${k(totals.vega)}${k(totals.theta)}</tr></tfoot>
+    </table>`;
+    return div;
+  }
+
+  function buildBlotter() {
+    const div = document.createElement('div');
+    div.className = 'panel-content';
+    div.innerHTML = `<table class="blotter">
+      <thead><tr><th>Time</th><th>Pair</th><th>Side</th><th>Amount</th><th>Rate</th><th>Status</th></tr></thead>
+      <tbody>${TRADES.map(t => `<tr>
+        <td class="time">${t.time}</td>
+        <td>${t.pair}</td>
+        <td class="${t.side === 'BUY' ? 'buy' : 'sell'}">${t.side}</td>
+        <td>${t.amt}</td>
+        <td>${t.rate}</td>
+        <td>${t.status}</td>
+      </tr>`).join('')}</tbody></table>`;
+    return div;
+  }
+
+  function buildPnL() {
+    const div = document.createElement('div');
+    div.className = 'panel-content';
+    const cards = [
+      { label:'Daily PnL',     value:'+$342,180',  cls:'pos', sub:'vs prev +$28k' },
+      { label:'MTD PnL',       value:'+$1,284,500', cls:'pos', sub:'on target' },
+      { label:'Open PnL',      value:'-$42,300',   cls:'neg', sub:'3 positions' },
+      { label:'Realised',      value:'+$384,480',  cls:'pos', sub:'12 trades' },
+      { label:'Max Drawdown',  value:'-$68,200',   cls:'neg', sub:'intraday' },
+      { label:'Sharpe (30d)',   value:'2.14',       cls:'pos', sub:'annualised' },
+    ];
+    div.innerHTML = `<div class="pnl-cards">${cards.map(c =>
+      `<div class="pnl-card"><div class="label">${c.label}</div><div class="value ${c.cls}">${c.value}</div><div class="sub">${c.sub}</div></div>`
+    ).join('')}</div>`;
+    return div;
+  }
+
+  function buildVolContent(pair) {
+    const div = document.createElement('div');
+    div.className = 'vol-container';
+    div.dataset.pair = pair;
+    return div;
+  }
+
+  // ── VolSurface lazy init ────────────────────────────────────────────────
+  const surfaces = new Map();
+
+  function ensureSurface(container) {
+    if (surfaces.has(container)) return;
+    const w = container.clientWidth, h = container.clientHeight;
+    if (w === 0 || h === 0) return;
+    const pair = container.dataset.pair;
+    const vs = new VolSurface(container, {
+      THREE: window.THREE, colormap: 'plasma', wireframe: false,
+      provider: createRandomProvider, initialData: buildVolGrid(pair),
+    });
+    surfaces.set(container, vs);
+  }
+
+  function resizeAll() {
+    for (const [, vs] of surfaces) {
+      const w = vs._container.clientWidth, h = vs._container.clientHeight;
+      if (w === 0 || h === 0) continue;
+      vs._camera.aspect = w / h;
+      vs._camera.updateProjectionMatrix();
+      vs._renderer.setSize(w, h);
+    }
+  }
+
+  // ── Build all content elements ──────────────────────────────────────────
+  const volEUR = buildVolContent('EURUSD');
+  const volJPY = buildVolContent('USDJPY');
+  const volGBP = buildVolContent('GBPUSD');
+  const volCHF = buildVolContent('USDCHF');
+  const volEls = [volEUR, volJPY, volGBP, volCHF];
+
+  const content = {
+    spotGrid:    buildSpotGrid(),
+    riskLadder:  buildRiskLadder(),
+    blotter:     buildBlotter(),
+    pnl:         buildPnL(),
+    volEUR, volJPY, volGBP, volCHF,
+  };
+
+  // ── Shared tab callbacks ────────────────────────────────────────────────
+  function onTabChange(activeId) {
+    setTimeout(() => {
+      const el = content[activeId];
+      if (el?.classList.contains('vol-container')) ensureSurface(el);
+      resizeAll();
+    }, 50);
+  }
+
+  // ── SplitPane ───────────────────────────────────────────────────────────
+  const sp = new SplitPane({
+    container: $('container'),
+    panes: { topLeft: $('pane-tl'), topRight: $('pane-tr'), bottomLeft: $('pane-bl'), bottomRight: $('pane-br') },
+    dividers: { vertical: $('div-v'), horizontal: $('div-h'), vertical2: $('div-v2') },
+    splitX: 0.55, splitY: 0.55, minPx: 100,
+    onChange() { setTimeout(resizeAll, 0); },
+  });
+
+  // ── MultiTabPanes ──────────────────────────────────────────────────────
+  new MultiTabPane({
+    container: $('pane-tl'), closable: true,
+    tabs: [
+      { id: 'spotGrid',   label: 'Spot Grid',   content: content.spotGrid },
+      { id: 'volEUR',     label: 'Vol EUR/USD',  content: content.volEUR },
+    ],
+    onChange: onTabChange, onDrop: onTabChange,
+  });
+
+  new MultiTabPane({
+    container: $('pane-tr'), closable: true,
+    tabs: [
+      { id: 'riskLadder', label: 'Risk Ladder',  content: content.riskLadder },
+      { id: 'volJPY',     label: 'Vol USD/JPY',  content: content.volJPY },
+    ],
+    onChange: onTabChange, onDrop: onTabChange,
+  });
+
+  new MultiTabPane({
+    container: $('pane-bl'), closable: true,
+    tabs: [
+      { id: 'blotter',    label: 'Blotter',      content: content.blotter },
+      { id: 'volGBP',     label: 'Vol GBP/USD',  content: content.volGBP },
+    ],
+    onChange: onTabChange, onDrop: onTabChange,
+  });
+
+  new MultiTabPane({
+    container: $('pane-br'), closable: true,
+    tabs: [
+      { id: 'pnl',        label: 'PnL Summary',  content: content.pnl },
+      { id: 'volCHF',     label: 'Vol USD/CHF',  content: content.volCHF },
+    ],
+    onChange: onTabChange, onDrop: onTabChange,
+  });
+
+  // ── Init visible vol surfaces ───────────────────────────────────────────
+  setTimeout(() => {
+    for (const el of volEls) ensureSurface(el);
+    resizeAll();
+  }, 100);
+</script>
+</body>
+</html>

@@ -18,13 +18,18 @@ export class VolSurface {
    * @param {boolean}     [options.wireframe=false]
    */
   constructor(container, options = {}) {
-    const { THREE, colormap = 'plasma', wireframe = false } = options;
+    const { THREE, colormap = 'plasma', wireframe = false, provider, initialData } = options;
     if (!THREE) throw new Error('VolSurface: options.THREE is required');
 
     this._THREE     = THREE;
     this._container = container;
     this._colormap  = colormap;
     this._wireframe = wireframe;
+
+    // Provider (factory → instance)
+    this._providerFactory = provider || null;
+    this._provider        = null;
+    this._initialData     = initialData || null;
 
     // Vol data
     this._volData = null;
@@ -86,7 +91,16 @@ export class VolSurface {
     if (this._handlers[event]) this._handlers[event].push(handler);
   }
 
+  setBaseline(data) {
+    if (!this._provider) throw new Error('VolSurface: no provider configured');
+    this._provider.setBaseline(data);
+  }
+
   destroy() {
+    if (this._provider) {
+      this._provider.destroy();
+      this._provider = null;
+    }
     cancelAnimationFrame(this._animFrameId);
     if (this._detachControls) this._detachControls();
 
@@ -158,6 +172,15 @@ export class VolSurface {
     this._updateCamera();
     this._buildAxesOnce();
     this._animate();
+
+    // Connect provider and load first snapshot
+    if (this._providerFactory) {
+      this._provider = this._providerFactory(data => this.setData(data));
+      if (this._initialData) {
+        this._provider.setBaseline(this._initialData);
+        this._initialData = null;
+      }
+    }
   }
 
   _buildAxesOnce() {

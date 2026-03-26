@@ -125,18 +125,17 @@ export function createDemo({ THREE }) {
   root.append(header, controls, stats, canvasWrap, legend);
 
   // VolSurface (needs to be in DOM for clientWidth/Height)
-  let vs       = null;
-  let provider = null;
+  let vs = null;
   let currentPair = 'EURUSD';
 
   function init() {
     vs = new VolSurface(canvasWrap, {
       THREE,
-      colormap:  colormapSelect.value,
-      wireframe: wireCheck.checked,
+      colormap:    colormapSelect.value,
+      wireframe:   wireCheck.checked,
+      provider:    createRandomProvider,
+      initialData: buildVolGrid(currentPair),
     });
-
-    provider = createRandomProvider(data => vs.setData(data));
 
     // Pair buttons
     pairBtns.addEventListener('click', e => {
@@ -148,13 +147,12 @@ export function createDemo({ THREE }) {
     wireCheck.addEventListener('change', () => vs.setWireframe(wireCheck.checked));
     colormapSelect.addEventListener('change', () => vs.setColormap(colormapSelect.value));
 
-    setPair(currentPair);
+    updateStats(currentPair);
   }
 
   function setPair(pairKey) {
     currentPair = pairKey;
-    const data = buildVolGrid(pairKey);
-    provider.setBaseline(data);
+    vs.setBaseline(buildVolGrid(pairKey));
     pairBtns.querySelectorAll('.pair-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.pair === pairKey);
     });
@@ -183,7 +181,6 @@ export function createDemo({ THREE }) {
     el: root,
     destroy() {
       observer.disconnect();
-      if (provider) provider.destroy();
       if (vs) vs.destroy();
     },
   };

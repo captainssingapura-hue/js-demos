@@ -1,6 +1,6 @@
 # Writing a Data Provider
 
-A data provider supplies volatility surface data to the demo. The demo is agnostic to where the data comes from — it could be a random walk, a WebSocket feed, a REST API, or a static file.
+A data provider supplies volatility surface data to `VolSurface`. The component is agnostic to where the data comes from — it could be a random walk, a WebSocket feed, a REST API, or a static file.
 
 ## Interface
 
@@ -78,25 +78,31 @@ export function createWsProvider(onData) {
 
 ## Wiring It Up
 
-In `demo.js`, swap the import:
+Pass the provider factory to the `VolSurface` constructor via the `provider` option. VolSurface will call the factory internally, supplying its own `setData` as the callback. Use `initialData` to supply the first snapshot:
 
 ```js
-// before
+import { VolSurface } from './vol-surface.js';
 import { createRandomProvider } from './random-provider.js';
-// after
-import { createWsProvider } from './ws-provider.js';
+import { buildVolGrid } from './fx-data.js';
+
+const vs = new VolSurface(container, {
+  THREE,
+  provider:    createRandomProvider,
+  initialData: buildVolGrid('EURUSD'),
+});
 ```
 
-Then change the one line that creates the provider:
+To switch instruments, call `vs.setBaseline()`:
 
 ```js
-// before
-const provider = createRandomProvider(data => vs.setData(data));
-// after
-const provider = createWsProvider(data => vs.setData(data));
+vs.setBaseline(buildVolGrid('USDJPY'));
 ```
 
-Nothing else needs to change — the demo, the surface, and the UI all work the same regardless of the data source.
+To swap providers, just change the import — the factory signature is the same for all providers.
+
+## Container Sizing
+
+`VolSurface` uses a `ResizeObserver` on its container element. It automatically adapts to external size changes — split panes, widget panels, window resizes, etc. No resize configuration is needed; just make sure the container has a defined size (e.g. via CSS) before constructing the `VolSurface`.
 
 ## Data Shape Notes
 

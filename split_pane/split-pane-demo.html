@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SplitPane.js — Demo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Syne:wght@400;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0d0f14;
+    --surface:  #13161d;
+    --border:   #1e2330;
+    --text:     #c8d0e8;
+    --muted:    #4e566e;
+    --accent:   #5b72b8;
+    --a: #5b72b8; --b: #5bb88a; --c: #b8a05b; --d: #b85b8a;
+    --div-size: 6px;
+  }
+
+  html, body { width:100%; height:100%; overflow:hidden; background:var(--bg); color:var(--text); font-family:'JetBrains Mono',monospace; }
+
+  /* ── Global dragging state (set by SplitPane.js) ── */
+  body.sp-dragging { user-select:none; cursor:col-resize; }
+
+  /* ── Shell ── */
+  #shell { display:flex; flex-direction:column; height:100vh; }
+
+  /* ── Header ── */
+  #header {
+    flex:0 0 auto;
+    height:48px;
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:18px; padding:0 20px;
+  }
+  #header .logo { font-family:'Syne',sans-serif; font-weight:800; font-size:15px; letter-spacing:-.02em; }
+  #header .logo em { font-style:normal; color:var(--accent); }
+  #header .badge {
+    font-size:9px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--muted); border:1px solid var(--border); border-radius:3px; padding:2px 7px;
+  }
+  #header .coords {
+    margin-left:auto; font-size:10px; color:var(--muted);
+    display:flex; gap:14px;
+  }
+  #header .coords span { color:var(--text); }
+  #reset-btn {
+    margin-left:8px; background:none; border:1px solid var(--border);
+    color:var(--muted); font-family:inherit; font-size:10px; letter-spacing:.06em;
+    padding:4px 10px; border-radius:3px; cursor:pointer; text-transform:uppercase;
+    transition:border-color .15s, color .15s;
+  }
+  #reset-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* ── Container (the split pane root) ── */
+  #container { flex:1 1 0; display:flex; flex-direction:column; overflow:hidden; }
+
+  /* rows */
+  .sp-row { display:flex; overflow:hidden; flex-shrink:0; }
+
+  /* panes */
+  .pane {
+    overflow:auto; display:flex; flex-direction:column; position:relative;
+    background:var(--surface); min-width:0; min-height:0;
+    border:1px solid var(--border);
+  }
+  .pane-head {
+    flex:0 0 auto; padding:8px 14px;
+    border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:8px;
+    font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted);
+  }
+  .pip { width:7px; height:7px; border-radius:50%; }
+  #pane-tl .pip { background:var(--a); }
+  #pane-tr .pip { background:var(--b); }
+  #pane-bl .pip { background:var(--c); }
+  #pane-br .pip { background:var(--d); }
+  .pane-body { flex:1; padding:18px 20px; overflow:auto; }
+
+  /* ── Dividers ── */
+  .sp-div {
+    flex:0 0 var(--div-size);
+    background:var(--border);
+    position:relative; z-index:5;
+    display:flex; align-items:center; justify-content:center;
+    transition:background .15s;
+  }
+  .sp-div-v { width:var(--div-size); cursor:col-resize; }
+  .sp-div-h { height:var(--div-size); cursor:row-resize; width:100%; }
+  .sp-div:hover, .sp-div.sp-active { background:var(--accent); }
+
+  /* handle dots */
+  .sp-div-v .grip { display:flex; flex-direction:column; gap:3px; pointer-events:none; opacity:.35; transition:opacity .15s; }
+  .sp-div-h .grip { display:flex; flex-direction:row;    gap:3px; pointer-events:none; opacity:.35; transition:opacity .15s; }
+  .sp-div:hover .grip, .sp-div.sp-active .grip { opacity:.9; }
+  .grip-dot { width:3px; height:3px; border-radius:50%; background:var(--bg); }
+
+  /* ── Pane content typography ── */
+  h2 { font-family:'Syne',sans-serif; font-size:16px; font-weight:800; margin-bottom:10px; }
+  p  { font-size:11.5px; line-height:1.75; color:var(--muted); margin-bottom:10px; }
+  code, pre { font-family:'JetBrains Mono',monospace; }
+
+  .code-card {
+    background:#0a0c11; border:1px solid var(--border); border-radius:5px;
+    padding:14px 16px; font-size:11px; line-height:1.8; margin:10px 0;
+    overflow:auto; color:#7888b0;
+  }
+  .kw  { color:#7c8fc9; } .fn  { color:#c9a87c; }
+  .str { color:#7cb88a; } .cm  { color:#3a4155; }
+
+  .metric { margin:14px 0; }
+  .metric-val { font-family:'Syne',sans-serif; font-size:30px; font-weight:800; color:var(--text); }
+  .metric-sub { font-size:10px; color:var(--muted); margin-top:2px; }
+
+  .bar { margin:10px 0; }
+  .bar-lbl { font-size:10px; color:var(--muted); margin-bottom:5px; display:flex; justify-content:space-between; }
+  .bar-track { height:3px; background:var(--border); border-radius:2px; }
+  .bar-fill  { height:100%; border-radius:2px; }
+
+  .log-line {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:7px 0; border-bottom:1px solid var(--border); font-size:11px;
+  }
+  .log-line:last-child { border-bottom:none; }
+  .log-time { color:var(--muted); font-size:10px; }
+
+  .tag {
+    display:inline-block; font-size:9px; font-weight:700; letter-spacing:.08em;
+    text-transform:uppercase; padding:2px 7px; border-radius:3px; margin:2px 2px 2px 0;
+  }
+  .tag-a { background:#5b72b81a; color:var(--a); border:1px solid #5b72b830; }
+  .tag-b { background:#5bb88a1a; color:var(--b); border:1px solid #5bb88a30; }
+  .tag-c { background:#b8a05b1a; color:var(--c); border:1px solid #b8a05b30; }
+
+  /* pane-br live output */
+  .out-line { display:flex; gap:10px; margin:4px 0; font-size:11px; }
+  .out-key  { color:var(--muted); width:55px; flex-shrink:0; }
+  .out-val  { color:var(--text); }
+  .out-bar  { flex:1; display:flex; align-items:center; }
+  .out-track { flex:1; height:2px; background:var(--border); border-radius:1px; }
+  .out-fill  { height:100%; border-radius:1px; background:var(--accent); transition:width .05s; }
+</style>
+</head>
+<body>
+<div id="shell">
+
+  <!-- Header -->
+  <div id="header">
+    <div class="logo">Split<em>Pane</em>.js</div>
+    <div class="badge">ES Module</div>
+    <div class="badge">Zero Deps</div>
+    <div class="coords">
+      x: <span id="out-x">50.0</span>%
+      y: <span id="out-y">50.0</span>%
+      <button id="reset-btn">reset</button>
+    </div>
+  </div>
+
+  <!-- Root container handed to SplitPane -->
+  <div id="container">
+
+    <!-- Top row -->
+    <div class="sp-row" id="row-top">
+      <div class="pane" id="pane-tl">
+        <div class="pane-head"><span class="pip"></span>Module</div>
+        <div class="pane-body">
+          <h2>SplitPane.js</h2>
+          <p>A clean ES module that handles all layout maths, pointer / touch events, and cleanup — drop it into any project.</p>
+          <div class="code-card"><span class="cm">// import the module</span>
+<span class="kw">import</span> SplitPane <span class="kw">from</span> <span class="str">'./SplitPane.js'</span>;
+
+<span class="kw">const</span> sp = <span class="kw">new</span> <span class="fn">SplitPane</span>({
+  container : <span class="fn">$</span>(<span class="str">'#container'</span>),
+  panes     : { topLeft, topRight,
+                bottomLeft, bottomRight },
+  dividers  : { vertical, horizontal },
+  splitX    : <span class="fn">0.5</span>,
+  splitY    : <span class="fn">0.5</span>,
+  <span class="fn">onChange</span>  : ({ splitX, splitY }) => <span class="fn">log</span>(splitX),
+});</div>
+          <div class="tag tag-a">ES Module</div>
+          <div class="tag tag-b">Touch Ready</div>
+          <div class="tag tag-c">Vanilla JS</div>
+        </div>
+      </div>
+
+      <div class="sp-div sp-div-v" id="div-v">
+        <div class="grip"><div class="grip-dot"></div><div class="grip-dot"></div><div class="grip-dot"></div></div>
+      </div>
+
+      <div class="pane" id="pane-tr">
+        <div class="pane-head"><span class="pip"></span>Metrics</div>
+        <div class="pane-body">
+          <div class="metric">
+            <div class="metric-val">2,847</div>
+            <div class="metric-sub">events / sec</div>
+          </div>
+          <div class="bar">
+            <div class="bar-lbl"><span>CPU</span><span>62 %</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:62%;background:var(--a)"></div></div>
+          </div>
+          <div class="bar">
+            <div class="bar-lbl"><span>Memory</span><span>38 %</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:38%;background:var(--b)"></div></div>
+          </div>
+          <div class="bar">
+            <div class="bar-lbl"><span>Network</span><span>81 %</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:81%;background:var(--c)"></div></div>
+          </div>
+          <div class="metric" style="margin-top:20px">
+            <div class="metric-val">99.97<span style="font-size:16px;color:var(--muted)">%</span></div>
+            <div class="metric-sub">uptime</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Horizontal divider -->
+    <div class="sp-div sp-div-h" id="div-h">
+      <div class="grip"><div class="grip-dot"></div><div class="grip-dot"></div><div class="grip-dot"></div></div>
+    </div>
+
+    <!-- Bottom row -->
+    <div class="sp-row" id="row-bot">
+      <div class="pane" id="pane-bl">
+        <div class="pane-head"><span class="pip"></span>Console</div>
+        <div class="pane-body">
+          <div class="log-line"><span>→ SplitPane module loaded</span>     <span class="log-time">00:00.001</span></div>
+          <div class="log-line"><span>→ dividers bound (v + h)</span>       <span class="log-time">00:00.003</span></div>
+          <div class="log-line"><span>→ initial layout applied</span>        <span class="log-time">00:00.008</span></div>
+          <div class="log-line"><span>→ onChange callback wired</span>       <span class="log-time">00:00.009</span></div>
+          <div class="log-line" style="color:var(--b)"><span>✓ ready</span> <span class="log-time">00:00.010</span></div>
+        </div>
+      </div>
+
+      <div class="sp-div sp-div-v" id="div-v2">
+        <div class="grip"><div class="grip-dot"></div><div class="grip-dot"></div><div class="grip-dot"></div></div>
+      </div>
+
+      <div class="pane" id="pane-br">
+        <div class="pane-head"><span class="pip"></span>Live Output</div>
+        <div class="pane-body">
+          <p style="margin-bottom:14px">Drag any divider — ratios update in real time via the <code>onChange</code> callback.</p>
+          <div class="out-line">
+            <span class="out-key">splitX</span>
+            <span class="out-val" id="lx">50.0 %</span>
+            <span class="out-bar"><span class="out-track"><span class="out-fill" id="bx" style="width:50%"></span></span></span>
+          </div>
+          <div class="out-line">
+            <span class="out-key">left</span>
+            <span class="out-val" id="ll">50.0 %</span>
+            <span class="out-bar"><span class="out-track"><span class="out-fill" id="bl2" style="width:50%;background:var(--a)"></span></span></span>
+          </div>
+          <div class="out-line">
+            <span class="out-key">right</span>
+            <span class="out-val" id="lr">50.0 %</span>
+            <span class="out-bar"><span class="out-track"><span class="out-fill" id="br2" style="width:50%;background:var(--b)"></span></span></span>
+          </div>
+          <div class="out-line" style="margin-top:12px">
+            <span class="out-key">splitY</span>
+            <span class="out-val" id="ly">50.0 %</span>
+            <span class="out-bar"><span class="out-track"><span class="out-fill" id="by" style="width:50%;background:var(--c)"></span></span></span>
+          </div>
+          <div class="out-line">
+            <span class="out-key">top</span>
+            <span class="out-val" id="lt">50.0 %</span>
+            <span class="out-bar"><span class="out-track"><span class="out-fill" id="bt" style="width:50%;background:var(--c)"></span></span></span>
+          </div>
+          <div class="out-line">
+            <span class="out-key">bottom</span>
+            <span class="out-val" id="lb">50.0 %</span>
+            <span class="out-bar"><span class="out-track"><span class="out-fill" id="bb" style="width:50%;background:var(--d)"></span></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /#container -->
+</div><!-- /#shell -->
+
+<script type="module">
+  import SplitPane from './SplitPane.js';
+
+  const $ = id => document.getElementById(id);
+
+  // ── Instantiate ────────────────────────────────────────────────────────────
+  const sp = new SplitPane({
+    container : $('container'),
+    panes: {
+      topLeft     : $('pane-tl'),
+      topRight    : $('pane-tr'),
+      bottomLeft  : $('pane-bl'),
+      bottomRight : $('pane-br'),
+    },
+    dividers: {
+      vertical   : $('div-v'),
+      horizontal : $('div-h'),
+      vertical2  : $('div-v2'),
+    },
+    splitX   : 0.5,
+    splitY   : 0.5,
+    minPx    : 70,
+    onChange : ({ splitX, splitY }) => updateUI(splitX, splitY),
+  });
+
+  // ── Live UI update via onChange callback ───────────────────────────────────
+  function pct(n)  { return (n * 100).toFixed(1) + ' %'; }
+  function bar(id, w) { $(id).style.width = (w * 100).toFixed(1) + '%'; }
+
+  function updateUI(splitX, splitY) {
+    $('out-x').textContent = (splitX * 100).toFixed(1);
+    $('out-y').textContent = (splitY * 100).toFixed(1);
+
+    $('lx').textContent = pct(splitX);   bar('bx',  splitX);
+    $('ll').textContent = pct(splitX);   bar('bl2', splitX);
+    $('lr').textContent = pct(1-splitX); bar('br2', 1-splitX);
+
+    $('ly').textContent = pct(splitY);   bar('by',  splitY);
+    $('lt').textContent = pct(splitY);   bar('bt',  splitY);
+    $('lb').textContent = pct(1-splitY); bar('bb',  1-splitY);
+  }
+
+  // seed initial display
+  updateUI(0.5, 0.5);
+
+  // ── Reset button — demonstrates programmatic API ───────────────────────────
+  $('reset-btn').addEventListener('click', () => {
+    sp.setSplit(0.5, 0.5);
+    updateUI(0.5, 0.5);
+  });
+</script>
+</body>
+</html>
