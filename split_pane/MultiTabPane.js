@@ -1,7 +1,10 @@
 /**
  * MultiTabPane.js
- * A zero-dependency ES module for tabbed pane layouts with drag-and-drop
- * tab reordering and cross-pane tab transfer.
+ * A zero-dependency ES module for tabbed pane layouts with Chrome-style
+ * drag-and-drop tab reordering and cross-pane tab transfer.
+ *
+ * Drag behaviour mirrors Chrome: tabs swap positions live when the
+ * dragged tab passes the 50 % midpoint of a neighbour.
  *
  * Usage:
  *   import MultiTabPane from './MultiTabPane.js';
@@ -15,7 +18,7 @@
  *     activeTab : 'tab1',          // optional, defaults to first tab
  *     closable  : true,            // optional, show close buttons
  *     onChange  : (activeId) => {}, // optional, fires on tab switch
- *     onDrop    : (tabId, from, to) => {}, // optional, fires after cross-pane drop
+ *     onReorder : (order) => {},    // optional, fires after reorder / cross-pane drop
  *     onClose   : (tabId) => {},   // optional, fires after tab closed
  *   });
  *
@@ -29,12 +32,18 @@
 
 // ── Shared drag state (singleton across all instances) ──────────────────
 const _drag = {
-  /** @type {MultiTabPane|null} */ source: null,
-  /** @type {string|null} */       tabId:  null,
-  /** @type {HTMLElement|null} */   ghost:  null,
+  /** @type {MultiTabPane|null} */  current:  null,   // pane the tab is currently in
+  /** @type {string|null} */        tabId:    null,
+  /** @type {HTMLElement|null} */   btn:      null,
+  active:   false,
+  startX:   0,
+  startY:   0,
+  offsetX:  0,                                        // cursor offset within tab
 };
 
-// Registry of all live instances — used for cross-pane drop detection
+const DRAG_THRESHOLD = 4;   // px of movement before entering drag mode
+
+// Registry of all live instances
 const _instances = new Set();
 
 export default class MultiTabPane {
@@ -45,7 +54,7 @@ export default class MultiTabPane {
    * @param {string}   [opts.activeTab]
    * @param {boolean}  [opts.closable=false]
    * @param {function} [opts.onChange]
-   * @param {function} [opts.onDrop]
+   * @param {function} [opts.onReorder]
    * @param {function} [opts.onClose]
    */
   constructor(opts = {}) {
@@ -55,7 +64,7 @@ export default class MultiTabPane {
       activeTab = null,
       closable  = false,
       onChange   = null,
-      onDrop    = null,
+      onReorder = null,
       onClose   = null,
     } = opts;
 
@@ -64,11 +73,11 @@ export default class MultiTabPane {
     this._container = container;
     this._closable  = closable;
     this._onChange   = onChange;
-    this._onDrop    = onDrop;
+    this._onReorder = onReorder;
     this._onClose   = onClose;
     this._listeners = [];
 
-    // Tab data: Map<id, { id, label, content }>
+    // Tab data: Map<id, { id, label, content, btn, panel }>
     this._tabs   = new Map();
     this._order  = [];         // ordered list of ids
     this._active = null;
@@ -81,11 +90,6 @@ export default class MultiTabPane {
     this._container.appendChild(this._bar);
     this._container.appendChild(this._body);
 
-    // Drop indicator
-    this._dropIndicator = document.createElement('div');
-    this._dropIndicator.className = 'mtp-drop-indicator';
-    this._bar.appendChild(this._dropIndicator);
-
     // Seed initial tabs
     for (const t of tabs) this._insertTab(t);
 
@@ -95,11 +99,6 @@ export default class MultiTabPane {
     } else if (this._order.length) {
       this._setActive(this._order[0]);
     }
-
-    // Listen for dragover / drop on bar (for receiving tabs)
-    this._on(this._bar, 'dragover', e => this._onBarDragOver(e));
-    this._on(this._bar, 'dragleave', e => this._onBarDragLeave(e));
-    this._on(this._bar, 'drop', e => this._onBarDrop(e));
 
     _instances.add(this);
   }
@@ -164,7 +163,6 @@ export default class MultiTabPane {
     const btn = document.createElement('div');
     btn.className = 'mtp-tab';
     btn.dataset.tabId = id;
-    btn.setAttribute('draggable', 'true');
 
     const span = document.createElement('span');
     span.className = 'mtp-tab-label';
@@ -175,7 +173,7 @@ export default class MultiTabPane {
       const close = document.createElement('span');
       close.className = 'mtp-tab-close';
       close.textContent = '\u00d7';
-      close.addEventListener('click', e => {
+      this._on(close, 'click', e => {
         e.stopPropagation();
         this._removeTab(id);
         this._onClose?.(id);
@@ -184,37 +182,7 @@ export default class MultiTabPane {
     }
 
     // Click to activate
-    this._on(btn, 'click', () => this._setActive(id));
-
-    // Drag start
-    this._on(btn, 'dragstart', e => {
-      _drag.source = this;
-      _drag.tabId  = id;
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', id);
-      btn.classList.add('mtp-tab-dragging');
-
-      // Ghost
-      const ghost = btn.cloneNode(true);
-      ghost.classList.add('mtp-ghost');
-      document.body.appendChild(ghost);
-      e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, ghost.offsetHeight / 2);
-      _drag.ghost = ghost;
-
-      requestAnimationFrame(() => btn.classList.add('mtp-tab-dragging'));
-    });
-
-    this._on(btn, 'dragend', () => {
-      btn.classList.remove('mtp-tab-dragging');
-      this._dropIndicator.style.display = 'none';
-      if (_drag.ghost) { _drag.ghost.remove(); _drag.ghost = null; }
-      _drag.source = null;
-      _drag.tabId  = null;
-      // Clear indicators on all instances
-      for (const inst of _instances) {
-        inst._dropIndicator.style.display = 'none';
-      }
-    });
+    this._on(btn, 'mousedown', e => this._onTabPointerDown(e, id));
 
     // Content panel
     const panel = document.createElement('div');
@@ -223,15 +191,15 @@ export default class MultiTabPane {
     if (content) panel.appendChild(content);
 
     // Insert at position
-    const idx = (index != null && index >= 0 && index < this._order.length)
+    const idx = (index != null && index >= 0 && index <= this._order.length)
       ? index : this._order.length;
 
     if (idx < this._order.length) {
-      const refBtn = this._bar.querySelector(`[data-tab-id="${this._order[idx]}"]`);
+      const refBtn = this._tabs.get(this._order[idx]).btn;
       this._bar.insertBefore(btn, refBtn);
       this._order.splice(idx, 0, id);
     } else {
-      this._bar.insertBefore(btn, this._dropIndicator);
+      this._bar.appendChild(btn);
       this._order.push(id);
     }
     this._body.appendChild(panel);
@@ -267,101 +235,177 @@ export default class MultiTabPane {
     if (prev !== id) this._onChange?.(id);
   }
 
-  // ─── Private: drop target handling ──────────────────────────────────────
+  // ─── Private: Chrome-style pointer drag ─────────────────────────────────
 
-  _onBarDragOver(e) {
-    if (!_drag.tabId) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+  _onTabPointerDown(e, id) {
+    // Ignore right-click / close button
+    if (e.button !== 0) return;
+    if (e.target.classList.contains('mtp-tab-close')) return;
 
-    // Find insertion position and show indicator
-    const tabEls = [...this._bar.querySelectorAll('.mtp-tab:not(.mtp-tab-dragging)')];
-    let insertIdx = this._order.length;
+    const btn = this._tabs.get(id).btn;
 
-    for (let i = 0; i < tabEls.length; i++) {
-      const rect = tabEls[i].getBoundingClientRect();
-      if (e.clientX < rect.left + rect.width / 2) {
-        insertIdx = this._order.indexOf(tabEls[i].dataset.tabId);
-        // Position indicator
-        this._dropIndicator.style.display = 'block';
-        this._dropIndicator.style.left = (rect.left - this._bar.getBoundingClientRect().left) + 'px';
-        return;
-      }
-    }
+    _drag.current = this;
+    _drag.tabId   = id;
+    _drag.btn     = btn;
+    _drag.active  = false;
+    _drag.startX  = e.clientX;
+    _drag.startY  = e.clientY;
+    _drag.offsetX = e.clientX - btn.getBoundingClientRect().left;
 
-    // After last tab
-    if (tabEls.length) {
-      const last = tabEls[tabEls.length - 1].getBoundingClientRect();
-      this._dropIndicator.style.display = 'block';
-      this._dropIndicator.style.left = (last.right - this._bar.getBoundingClientRect().left) + 'px';
-    }
+    const onMove = (ev) => this._onPointerMove(ev);
+    const onUp   = (ev) => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+      this._onPointerUp(ev);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
   }
 
-  _onBarDragLeave(e) {
-    // Only hide if truly leaving the bar
-    if (!this._bar.contains(e.relatedTarget)) {
-      this._dropIndicator.style.display = 'none';
-    }
-  }
+  _onPointerMove(e) {
+    const dx = e.clientX - _drag.startX;
+    const dy = e.clientY - _drag.startY;
 
-  _onBarDrop(e) {
-    e.preventDefault();
-    this._dropIndicator.style.display = 'none';
-
-    const dragId     = _drag.tabId;
-    const fromPane   = _drag.source;
-    if (!dragId || !fromPane) return;
-
-    // Determine insertion index
-    const tabEls = [...this._bar.querySelectorAll('.mtp-tab:not(.mtp-tab-dragging)')];
-    let insertIdx = this._order.length;
-    for (let i = 0; i < tabEls.length; i++) {
-      const rect = tabEls[i].getBoundingClientRect();
-      if (e.clientX < rect.left + rect.width / 2) {
-        insertIdx = this._order.indexOf(tabEls[i].dataset.tabId);
-        break;
-      }
+    // Threshold check
+    if (!_drag.active) {
+      if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+      _drag.active = true;
+      _drag.btn.classList.add('mtp-tab-dragging');
+      document.body.classList.add('mtp-dragging');
     }
 
-    if (fromPane === this) {
-      // Reorder within same pane
-      this._reorderTab(dragId, insertIdx);
-    } else {
+    // Check if cursor entered a different pane's bar
+    const targetPane = this._hitTestBar(e.clientX, e.clientY);
+
+    if (targetPane && targetPane !== _drag.current) {
       // Cross-pane transfer
-      const tabData = fromPane._tabs.get(dragId);
-      if (!tabData) return;
+      const fromPane = _drag.current;
+      const tabData  = fromPane._tabs.get(_drag.tabId);
+      if (tabData) {
+        const content = tabData.panel.firstChild;
+        const label   = tabData.label;
 
-      // Extract content before removing
-      const content = tabData.panel.firstChild;
-      const label   = tabData.label;
-      fromPane._removeTab(dragId);
+        // Remove from source (without changing active in source yet)
+        tabData.btn.remove();
+        tabData.panel.remove();
+        fromPane._tabs.delete(_drag.tabId);
+        fromPane._order = fromPane._order.filter(i => i !== _drag.tabId);
+        if (fromPane._active === _drag.tabId) {
+          fromPane._active = null;
+          if (fromPane._order.length) fromPane._setActive(fromPane._order[0]);
+        }
 
-      this._insertTab({ id: dragId, label, content }, insertIdx);
-      this._setActive(dragId);
+        // Insert into target at the right position
+        const insertIdx = targetPane._hitTestIndex(e.clientX);
+        targetPane._insertTab({ id: _drag.tabId, label, content }, insertIdx);
+        targetPane._setActive(_drag.tabId);
 
-      this._onDrop?.(dragId, fromPane, this);
-      fromPane._onDrop?.(dragId, fromPane, this);
+        // Update drag state
+        _drag.btn     = targetPane._tabs.get(_drag.tabId).btn;
+        _drag.current = targetPane;
+        _drag.btn.classList.add('mtp-tab-dragging');
+
+        fromPane._onReorder?.(fromPane._order);
+        targetPane._onReorder?.(targetPane._order);
+      }
     }
+
+    const cx = e.clientX;
+
+    // Same-pane reorder: check if we've passed the midpoint of a neighbour
+    const pane    = _drag.current;
+    const dragIdx = pane._order.indexOf(_drag.tabId);
+
+    // Check rightward swap
+    if (dragIdx < pane._order.length - 1) {
+      const rightId  = pane._order[dragIdx + 1];
+      const rightBtn = pane._tabs.get(rightId).btn;
+      const rightRect = rightBtn.getBoundingClientRect();
+      if (cx > rightRect.left + rightRect.width / 2) {
+        pane._swapOrder(dragIdx, dragIdx + 1);
+      }
+    }
+
+    // Check leftward swap
+    else if (dragIdx > 0) {
+      const leftId  = pane._order[dragIdx - 1];
+      const leftBtn = pane._tabs.get(leftId).btn;
+      const leftRect = leftBtn.getBoundingClientRect();
+      if (cx < leftRect.left + leftRect.width / 2) {
+        pane._swapOrder(dragIdx, dragIdx - 1);
+      }
+    }
+
+    // Visual translate of dragged tab (follow cursor, clamped to bar)
+    this._applyDragTranslate(cx);
   }
 
-  _reorderTab(id, toIdx) {
-    const fromIdx = this._order.indexOf(id);
-    if (fromIdx === -1 || fromIdx === toIdx) return;
+  _onPointerUp(_e) {
+    if (_drag.active) {
+      _drag.btn.classList.remove('mtp-tab-dragging');
+      _drag.btn.style.transform = '';
+      document.body.classList.remove('mtp-dragging');
 
-    // Remove from old position
-    this._order.splice(fromIdx, 1);
-    // Adjust index if needed
-    if (toIdx > fromIdx) toIdx--;
-    this._order.splice(toIdx, 0, id);
-
-    // Reorder DOM
-    const tab = this._tabs.get(id);
-    if (toIdx < this._order.length - 1) {
-      const refId  = this._order[toIdx + 1];
-      const refBtn = this._tabs.get(refId).btn;
-      this._bar.insertBefore(tab.btn, refBtn);
+      // Activate the tab we just dropped
+      _drag.current._setActive(_drag.tabId);
     } else {
-      this._bar.insertBefore(tab.btn, this._dropIndicator);
+      // It was a click, not a drag — activate
+      _drag.current._setActive(_drag.tabId);
     }
+
+    _drag.current = null;
+    _drag.tabId   = null;
+    _drag.btn     = null;
+    _drag.active  = false;
+  }
+
+  /** Swap two adjacent entries in _order and reorder the DOM to match. */
+  _swapOrder(idxA, idxB) {
+    const [lo, hi] = idxA < idxB ? [idxA, idxB] : [idxB, idxA];
+
+    // Swap in the order array
+    [this._order[lo], this._order[hi]] = [this._order[hi], this._order[lo]];
+
+    // Reorder DOM: place the lo-index tab before the hi-index tab
+    const loBtn = this._tabs.get(this._order[lo]).btn;
+    const hiBtn = this._tabs.get(this._order[hi]).btn;
+    this._bar.insertBefore(loBtn, hiBtn);
+
+    this._onReorder?.(this._order);
+  }
+
+  /** Apply translateX to the dragged tab so it follows the cursor, clamped to bar bounds. */
+  _applyDragTranslate(cx) {
+    const tabRect = _drag.btn.getBoundingClientRect();
+    const barRect = _drag.current._bar.getBoundingClientRect();
+    const halfW   = tabRect.width / 2;
+
+    // Clamp cursor so the tab stays within the bar
+    const clampedCx = Math.max(barRect.left + halfW, Math.min(cx, barRect.right - halfW));
+
+    const naturalCenter = tabRect.left + halfW;
+    const shift = clampedCx - naturalCenter;
+    _drag.btn.style.transform = `translateX(${shift}px)`;
+  }
+
+  /** Find which pane's bar the cursor is over (if any). */
+  _hitTestBar(cx, cy) {
+    for (const inst of _instances) {
+      const r = inst._bar.getBoundingClientRect();
+      if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) {
+        return inst;
+      }
+    }
+    return null;
+  }
+
+  /** Determine the insertion index for a cursor x position in this pane. */
+  _hitTestIndex(cx) {
+    for (let i = 0; i < this._order.length; i++) {
+      const btn  = this._tabs.get(this._order[i]).btn;
+      const rect = btn.getBoundingClientRect();
+      if (cx < rect.left + rect.width / 2) return i;
+    }
+    return this._order.length;
   }
 }
