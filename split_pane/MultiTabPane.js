@@ -1,10 +1,12 @@
 /**
  * MultiTabPane.js
- * A zero-dependency ES module for tabbed pane layouts with Chrome-style
- * drag-and-drop tab reordering and cross-pane tab transfer.
+ * An ES module for tabbed pane layouts with Chrome-style drag-and-drop tab
+ * reordering, cross-pane tab transfer, and tab detach/re-dock via ModalControl.
  *
- * Drag behaviour mirrors Chrome: tabs swap positions live when the
- * dragged tab passes the 50 % midpoint of a neighbour.
+ * Drag behaviour mirrors Chrome: tabs swap positions live when the dragged tab
+ * passes the 50 % midpoint of a neighbour.  Dragging a tab downward past
+ * DETACH_THRESHOLD_Y pixels (while not over any bar) detaches it into a
+ * floating modal window.  Dragging that modal back over any tab bar re-docks it.
  *
  * Usage:
  *   import MultiTabPane from './MultiTabPane.js';
@@ -15,11 +17,12 @@
  *       { id: 'tab1', label: 'First',  content: someElement },
  *       { id: 'tab2', label: 'Second', content: anotherElement },
  *     ],
- *     activeTab : 'tab1',          // optional, defaults to first tab
- *     closable  : true,            // optional, show close buttons
- *     onChange  : (activeId) => {}, // optional, fires on tab switch
- *     onReorder : (order) => {},    // optional, fires after reorder / cross-pane drop
- *     onClose   : (tabId) => {},   // optional, fires after tab closed
+ *     activeTab  : 'tab1',          // optional, defaults to first tab
+ *     closable   : true,            // optional, show close buttons
+ *     detachable : true,            // optional (default true), enable detach
+ *     onChange   : (activeId) => {}, // optional, fires on tab switch
+ *     onReorder  : (order) => {},    // optional, fires after reorder / cross-pane drop
+ *     onClose    : (tabId) => {},   // optional, fires after tab closed
  *   });
  *
  *   tp.addTab({ id: 'tab3', label: 'Third', content: el });
@@ -30,18 +33,64 @@
  *   tp.destroy();
  */
 
+import ModalControl from '../modal_panel/ModalControl.js';
+
 // ── Shared drag state (singleton across all instances) ──────────────────
 const _drag = {
-  /** @type {MultiTabPane|null} */  current:  null,   // pane the tab is currently in
-  /** @type {string|null} */        tabId:    null,
-  /** @type {HTMLElement|null} */   btn:      null,
-  active:   false,
-  startX:   0,
-  startY:   0,
-  offsetX:  0,                                        // cursor offset within tab
+  /** @type {MultiTabPane|null} */  current:       null,   // pane the tab is currently in
+  /** @type {string|null} */        tabId:         null,
+  /** @type {HTMLElement|null} */   btn:           null,
+  active:        false,
+  startX:        0,
+  startY:        0,
+  offsetX:       0,                                        // cursor offset within tab
+  detached:      false,   // tab is floating as a ModalControl
+  modal:         null,    // ModalControl instance while detached
+  detachLabel:   null,    // saved label (tab button gone after detach)
+  detachContent: null,    // saved content element (panel gone after detach)
 };
 
-const DRAG_THRESHOLD = 4;   // px of movement before entering drag mode
+const DRAG_THRESHOLD   = 4;    // px of movement before entering drag mode
+const DETACH_THRESHOLD_Y = 40; // px downward from mousedown to trigger detach
+
+/**
+ * Wire up a floating ModalControl so dragging its title bar back over any
+ * registered tab bar re-docks the tab.  Called once after mouseup while detached.
+ */
+function _enableRedock(modal, tabId, label, content) {
+  const onTitleDown = (e) => {
+    if (!e.target.closest('.mp-title-bar') || e.button !== 0) return;
+
+    const onMove = (mv) => {
+      for (const inst of _instances) {
+        const r = inst._bar.getBoundingClientRect();
+        if (mv.clientX >= r.left && mv.clientX <= r.right &&
+            mv.clientY >= r.top  && mv.clientY <= r.bottom) {
+          // Cursor is over a tab bar — re-dock
+          modal.el.removeEventListener('mousedown', onTitleDown);
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup',   onUp);
+          modal.destroy();
+          const idx = inst._hitTestIndex(mv.clientX);
+          inst._insertTab({ id: tabId, label, content }, idx);
+          inst._setActive(tabId);
+          inst._onReorder?.(inst._order);
+          return;
+        }
+      }
+    };
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+  };
+
+  modal.el.addEventListener('mousedown', onTitleDown);
+}
 
 // Registry of all live instances
 const _instances = new Set();
@@ -53,6 +102,7 @@ export default class MultiTabPane {
    * @param {Array<{ id: string, label: string, content: HTMLElement }>} [opts.tabs]
    * @param {string}   [opts.activeTab]
    * @param {boolean}  [opts.closable=false]
+   * @param {boolean}  [opts.detachable=true]
    * @param {function} [opts.onChange]
    * @param {function} [opts.onReorder]
    * @param {function} [opts.onClose]
@@ -60,21 +110,25 @@ export default class MultiTabPane {
   constructor(opts = {}) {
     const {
       container,
-      tabs      = [],
-      activeTab = null,
-      closable  = false,
+      tabs       = [],
+      activeTab  = null,
+      closable   = false,
+      detachable = true,
+      workspace  = null,   // optional element — floating modals are clamped to its rect
       onChange   = null,
-      onReorder = null,
-      onClose   = null,
+      onReorder  = null,
+      onClose    = null,
     } = opts;
 
     if (!container) throw new Error('[MultiTabPane] opts.container is required');
 
-    this._container = container;
-    this._closable  = closable;
+    this._container  = container;
+    this._closable   = closable;
+    this._detachable = detachable;
+    this._workspace  = workspace;
     this._onChange   = onChange;
-    this._onReorder = onReorder;
-    this._onClose   = onClose;
+    this._onReorder  = onReorder;
+    this._onClose    = onClose;
     this._listeners = [];
 
     // Tab data: Map<id, { id, label, content, btn, panel }>
@@ -270,10 +324,27 @@ export default class MultiTabPane {
     if (!_drag.active) {
       if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
       _drag.active = true;
-      _drag.btn.classList.add('mtp-tab-dragging');
+      _drag.btn?.classList.add('mtp-tab-dragging');
       document.body.classList.add('mtp-dragging');
     }
 
+    // ── B. Detach check ──────────────────────────────────────────────────
+    if (!_drag.detached && this._detachable) {
+      if (Math.abs(dy) > DETACH_THRESHOLD_Y && !this._hitTestBar(e.clientX, e.clientY)) {
+        this._detachTab(e);
+        return;
+      }
+    }
+
+    // ── C. Detached: move modal + check for re-dock ──────────────────────
+    if (_drag.detached) {
+      _drag.modal.moveTo(e.clientX - _drag.offsetX, e.clientY - 16);
+      const dockTarget = this._hitTestBar(e.clientX, e.clientY);
+      if (dockTarget) this._dockTab(dockTarget, e.clientX, e);
+      return;
+    }
+
+    // ── D. Cross-pane transfer ────────────────────────────────────────────
     // Check if cursor entered a different pane's bar
     const targetPane = this._hitTestBar(e.clientX, e.clientY);
 
@@ -341,6 +412,22 @@ export default class MultiTabPane {
   }
 
   _onPointerUp(_e) {
+    if (_drag.detached) {
+      document.body.classList.remove('mtp-dragging');
+      // Enable re-docking: dragging the modal's title bar back over a tab bar
+      // will destroy the modal and insert the tab at the target position.
+      _enableRedock(_drag.modal, _drag.tabId, _drag.detachLabel, _drag.detachContent);
+      _drag.detached      = false;
+      _drag.modal         = null;
+      _drag.detachLabel   = null;
+      _drag.detachContent = null;
+      _drag.current       = null;
+      _drag.tabId         = null;
+      _drag.btn           = null;
+      _drag.active        = false;
+      return;
+    }
+
     if (_drag.active) {
       _drag.btn.classList.remove('mtp-tab-dragging');
       _drag.btn.style.transform = '';
@@ -376,6 +463,7 @@ export default class MultiTabPane {
 
   /** Apply translateX to the dragged tab so it follows the cursor, clamped to bar bounds. */
   _applyDragTranslate(cx) {
+    if (!_drag.btn || !_drag.current) return;
     const tabRect = _drag.btn.getBoundingClientRect();
     const barRect = _drag.current._bar.getBoundingClientRect();
     const halfW   = tabRect.width / 2;
@@ -386,6 +474,68 @@ export default class MultiTabPane {
     const naturalCenter = tabRect.left + halfW;
     const shift = clampedCx - naturalCenter;
     _drag.btn.style.transform = `translateX(${shift}px)`;
+  }
+
+  /** Detach the dragged tab from its pane into a floating ModalControl. */
+  _detachTab(e) {
+    const fromPane  = _drag.current;
+    const workspace = fromPane._workspace;   // capture before pane state changes
+    const tabData   = fromPane._tabs.get(_drag.tabId);
+    if (!tabData) return;
+
+    // Save before removal
+    _drag.detachLabel   = tabData.label;
+    _drag.detachContent = tabData.content;
+
+    // Remove from pane (handles active fallback internally)
+    fromPane._removeTab(_drag.tabId);
+    fromPane._onReorder?.(fromPane._order);
+
+    // Create floating modal anchored to cursor, optionally clamped to workspace
+    const modal = new ModalControl({
+      container : document.body,
+      title     : _drag.detachLabel,
+      content   : _drag.detachContent,
+      x         : e.clientX - _drag.offsetX,
+      y         : e.clientY - 16,
+      width     : 440,
+      height    : 300,
+      resizable : true,
+      closable  : true,
+      bounds    : workspace,
+    });
+
+    _drag.detached = true;
+    _drag.modal    = modal;
+    _drag.btn      = null;
+    _drag.current  = null;
+  }
+
+  /** Re-dock the detached tab into targetPane at cursor position cx. */
+  _dockTab(targetPane, cx, e) {
+    const content = _drag.detachContent;
+    const label   = _drag.detachLabel;
+    const tabId   = _drag.tabId;
+
+    // Destroy modal; content stays reachable via saved reference
+    _drag.modal.destroy();
+
+    // Insert into target pane
+    const insertIdx = targetPane._hitTestIndex(cx);
+    targetPane._insertTab({ id: tabId, label, content }, insertIdx);
+    targetPane._setActive(tabId);
+
+    // Resume docked drag
+    _drag.detached      = false;
+    _drag.modal         = null;
+    _drag.detachLabel   = null;
+    _drag.detachContent = null;
+    _drag.current       = targetPane;
+    _drag.btn           = targetPane._tabs.get(tabId).btn;
+    _drag.btn.classList.add('mtp-tab-dragging');
+    _drag.startY        = e.clientY;   // reset so threshold is fresh after re-dock
+
+    targetPane._onReorder?.(targetPane._order);
   }
 
   /** Find which pane's bar the cursor is over (if any). */
