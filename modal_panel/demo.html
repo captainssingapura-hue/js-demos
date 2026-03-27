@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ModalPanel Demo</title>
+<style>
+  /* ── Reset ─────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+  /* ── Theme ─────────────────────────────────────────────────────────── */
+  :root {
+    --bg:      #0d1117;
+    --surface: #161b22;
+    --border:  #30363d;
+    --text:    #c9d1d9;
+    --muted:   #8b949e;
+    --accent:  #58a6ff;
+    --green:   #3fb950;
+    --red:     #f85149;
+    --yellow:  #d29922;
+    --title-h: 32px;
+    --handle:  6px;
+  }
+
+  html, body { height:100%; }
+  body {
+    font: 13px/1.5 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+  }
+
+  /* ── ModalPanel component styles ───────────────────────────────────── */
+  .mp-panel {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.3);
+    overflow: hidden;
+    transition: box-shadow .15s;
+  }
+
+  .mp-title-bar {
+    display: flex;
+    align-items: center;
+    height: var(--title-h);
+    padding: 0 10px;
+    background: rgba(255,255,255,.03);
+    border-bottom: 1px solid var(--border);
+    cursor: grab;
+    user-select: none;
+    flex-shrink: 0;
+  }
+  .mp-title-bar:active { cursor: grabbing; }
+
+  .mp-title-label {
+    flex: 1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mp-close {
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--muted);
+    padding: 0 2px;
+    transition: color .12s;
+  }
+  .mp-close:hover { color: var(--red); }
+
+  .mp-body {
+    flex: 1;
+    overflow: auto;
+    padding: 12px;
+  }
+
+  /* ── Resize handles ────────────────────────────────────────────────── */
+  .mp-handle { position: absolute; }
+
+  .mp-handle-n  { top:0;    left:var(--handle); right:var(--handle); height:var(--handle); }
+  .mp-handle-s  { bottom:0; left:var(--handle); right:var(--handle); height:var(--handle); }
+  .mp-handle-e  { right:0;  top:var(--handle);  bottom:var(--handle); width:var(--handle); }
+  .mp-handle-w  { left:0;   top:var(--handle);  bottom:var(--handle); width:var(--handle); }
+  .mp-handle-ne { top:0;    right:0;  width:var(--handle); height:var(--handle); }
+  .mp-handle-nw { top:0;    left:0;   width:var(--handle); height:var(--handle); }
+  .mp-handle-se { bottom:0; right:0;  width:var(--handle); height:var(--handle); }
+  .mp-handle-sw { bottom:0; left:0;   width:var(--handle); height:var(--handle); }
+
+  /* ── Body-level drag/resize cursors ────────────────────────────────── */
+  body.mp-dragging  { cursor: grabbing !important; user-select: none; }
+  body.mp-resizing  { user-select: none; }
+
+  /* ── Toolbar ───────────────────────────────────────────────────────── */
+  .toolbar {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 10000;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  }
+  .toolbar button {
+    background: rgba(255,255,255,.06);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background .12s, border-color .12s;
+  }
+  .toolbar button:hover {
+    background: rgba(255,255,255,.1);
+    border-color: var(--accent);
+  }
+
+  /* ── Demo content ──────────────────────────────────────────────────── */
+  .demo-note {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .demo-note strong { color: var(--text); }
+
+  table.demo-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  table.demo-table th {
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+  }
+  table.demo-table td {
+    padding: 4px 8px;
+    border-bottom: 1px solid rgba(48,54,61,.4);
+  }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+
+  .demo-log {
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 11px;
+    line-height: 1.8;
+    color: var(--muted);
+    max-height: 100%;
+    overflow-y: auto;
+  }
+  .demo-log .entry { border-bottom: 1px solid rgba(48,54,61,.3); padding: 2px 0; }
+  .demo-log .time  { color: var(--accent); margin-right: 8px; }
+  .demo-log .msg   { color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- Toolbar for toggling panels -->
+<div class="toolbar" id="toolbar"></div>
+
+<script type="module">
+import ModalPanel from './ModalPanel.js';
+
+// ── Helper: build content elements ────────────────────────────────────
+
+function makeNotes() {
+  const el = document.createElement('div');
+  el.className = 'demo-note';
+  el.innerHTML = `
+    <p><strong>ModalPanel</strong> is a zero-dependency floating panel.</p>
+    <p style="margin-top:8px">Features:</p>
+    <ul style="margin:6px 0 0 18px">
+      <li>Drag by title bar</li>
+      <li>Resize from any edge or corner</li>
+      <li>Auto z-index stacking</li>
+      <li>Close button &amp; toggle API</li>
+      <li>Min width / height constraints</li>
+      <li>Listener tracking &amp; clean destroy</li>
+    </ul>
+  `;
+  return el;
+}
+
+function makeTable() {
+  const pairs = [
+    ['EUR/USD', 1.08432, 1.08445, +0.0012],
+    ['GBP/USD', 1.26310, 1.26328, -0.0008],
+    ['USD/JPY', 154.872, 154.891, +0.234],
+    ['USD/CHF', 0.88120, 0.88142, -0.0003],
+    ['AUD/USD', 0.64518, 0.64536, +0.0015],
+  ];
+  const table = document.createElement('table');
+  table.className = 'demo-table';
+  table.innerHTML = `<thead><tr><th>Pair</th><th>Bid</th><th>Ask</th><th>Chg</th></tr></thead>`;
+  const tbody = document.createElement('tbody');
+  for (const [pair, bid, ask, chg] of pairs) {
+    const cls = chg >= 0 ? 'pos' : 'neg';
+    const sign = chg >= 0 ? '+' : '';
+    tbody.innerHTML += `<tr><td>${pair}</td><td>${bid}</td><td>${ask}</td><td class="${cls}">${sign}${chg}</td></tr>`;
+  }
+  table.appendChild(tbody);
+  return table;
+}
+
+function makeLog() {
+  const el = document.createElement('div');
+  el.className = 'demo-log';
+  const messages = [
+    'Panel system initialised',
+    'Connected to price feed',
+    'EUR/USD quote updated',
+    'Risk engine: recalculating',
+    'GBP/USD spread widened',
+    'Margin check passed',
+    'Order #1042 filled @ 1.08440',
+    'P&L snapshot saved',
+  ];
+  const now = new Date();
+  for (const msg of messages) {
+    const t = new Date(now - Math.random() * 3600000);
+    const ts = t.toLocaleTimeString('en-GB', { hour12: false });
+    el.innerHTML += `<div class="entry"><span class="time">${ts}</span><span class="msg">${msg}</span></div>`;
+  }
+  return el;
+}
+
+// ── Create panels ─────────────────────────────────────────────────────
+
+const panels = [];
+
+panels.push(new ModalPanel({
+  container: document.body,
+  title:     'About',
+  content:   makeNotes(),
+  x: 40, y: 80,
+  width: 320, height: 280,
+}));
+
+panels.push(new ModalPanel({
+  container: document.body,
+  title:     'Spot Prices',
+  content:   makeTable(),
+  x: 400, y: 100,
+  width: 400, height: 240,
+  minWidth: 260,
+}));
+
+panels.push(new ModalPanel({
+  container: document.body,
+  title:     'Event Log',
+  content:   makeLog(),
+  x: 200, y: 340,
+  width: 460, height: 220,
+  minWidth: 240,
+}));
+
+// ── Toolbar buttons ───────────────────────────────────────────────────
+
+const toolbar = document.getElementById('toolbar');
+const titles  = ['About', 'Spot Prices', 'Event Log'];
+
+for (let i = 0; i < panels.length; i++) {
+  const btn = document.createElement('button');
+  btn.textContent = titles[i];
+  btn.addEventListener('click', () => panels[i].toggle());
+  toolbar.appendChild(btn);
+}
+</script>
+</body>
+</html>
