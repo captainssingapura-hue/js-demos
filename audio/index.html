@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sonic Playground — Howler.js Demo</title>
+
+  <!-- External Dependencies -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- App Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="grain"></div>
+
+  <header>
+    <h1>Sonic Playground</h1>
+    <span class="tag">Howler.js Demo</span>
+  </header>
+
+  <nav id="nav">
+    <button class="active" data-page="pads">Sound Pads</button>
+    <button data-page="mixer">Mixer</button>
+    <button data-page="synth">Synth Keys</button>
+  </nav>
+
+  <main>
+    <!-- Sound Pads Page -->
+    <div class="page active" id="page-pads">
+      <div class="section-title">Drum Machine</div>
+      <div class="section-desc">Click a pad or press the keyboard shortcut to trigger sounds. Built with Howler.js.</div>
+      <div class="pad-grid" id="padGrid"></div>
+    </div>
+
+    <!-- Mixer Page -->
+    <div class="page" id="page-mixer">
+      <div class="section-title">Channel Mixer</div>
+      <div class="section-desc">Adjust volume and playback rate for each sound in real time.</div>
+      <div class="mixer-section" id="mixerChannels"></div>
+    </div>
+
+    <!-- Synth Page -->
+    <div class="page" id="page-synth">
+      <div class="section-title">Web Audio Synth</div>
+      <div class="section-desc">A simple oscillator synth using the Web Audio API alongside Howler. Click keys or use your keyboard.</div>
+      <div class="wave-select" id="waveSelect">
+        <button class="active" data-wave="sine">Sine</button>
+        <button data-wave="square">Square</button>
+        <button data-wave="sawtooth">Saw</button>
+        <button data-wave="triangle">Triangle</button>
+      </div>
+      <div class="keyboard" id="keyboard"></div>
+      <div class="visualizer-container">
+        <canvas id="waveform"></canvas>
+      </div>
+    </div>
+  </main>
+
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <span id="statusText">Ready — click anywhere to enable audio</span>
+  </div>
+
+  <!-- App Script (loaded as module, deferred by default) -->
+  <script type="module" src="app.js"></script>
+
+</body>
+</html>

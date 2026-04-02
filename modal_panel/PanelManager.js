@@ -3,6 +3,9 @@
  * Orchestrates multiple ModalControl instances — manages z-index stacking,
  * panel registry, and bulk operations.
  *
+ * Note: panels should be mounted on `document.body` — see ModalControl.js
+ * for details on the container constraint.
+ *
  * Usage:
  *   import PanelManager from './PanelManager.js';
  *   import ModalControl from './ModalControl.js';

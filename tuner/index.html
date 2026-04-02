@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guitar Tuner — Web Audio Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="grain"></div>
+
+  <header>
+    <h1>Guitar Tuner</h1>
+    <span class="tag">Mic &bull; YIN Pitch Detection</span>
+  </header>
+
+  <main>
+    <!-- Tuner Display -->
+    <div class="tuner-card">
+      <div class="tuner-note" id="tunerNote">—</div>
+      <div class="tuner-octave" id="tunerOctave"></div>
+      <div class="tuner-freq" id="tunerFreq">—</div>
+
+      <div class="tuner-meter">
+        <div class="meter-labels">
+          <span>-50¢</span>
+          <span>0</span>
+          <span>+50¢</span>
+        </div>
+        <div class="meter-track">
+          <div class="meter-center"></div>
+          <div class="meter-needle" id="tunerNeedle"></div>
+        </div>
+        <div class="tuner-cents" id="tunerCents"></div>
+      </div>
+
+      <div class="tuner-status" id="tunerStatus">
+        <span class="status-indicator" id="tunerIndicator"></span>
+        <span id="tunerStatusText">Press Start to begin</span>
+      </div>
+
+      <button class="tuner-btn" id="tunerToggle">Start</button>
+    </div>
+
+    <!-- String Reference -->
+    <div class="strings-card">
+      <div class="section-title">Standard Tuning Reference</div>
+      <div class="section-desc">Tap a string to hear its reference tone. The active string auto-detects from your playing.</div>
+      <div class="string-grid" id="stringGrid"></div>
+    </div>
+
+    <!-- Signal Visualizer -->
+    <div class="viz-card">
+      <div class="section-title">Signal</div>
+      <canvas id="vizCanvas"></canvas>
+    </div>
+  </main>
+
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <span id="statusText">Ready</span>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+/* ─── Shared Fretboard Styles (Canvas-based) ─── */
+
+/* The Fretboard class renders everything on <canvas>.
+   This file provides only the container sizing hint. */
+
+.fretboard {
+  /* not used — the class does not add this anymore */
+}

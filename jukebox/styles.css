@@ -1,0 +1,478 @@
+@import '../shared/audio/styles.css';
+@import '../shared/audio/fretboard.css';
+
+/* ─── 8-Bit Jukebox — styles.css ─── */
+
+/* ─── Toolbar ─── */
+.jb-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 0 1.5rem 0.8rem;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 10000;
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 0.2rem;
+}
+
+/* ─── Track Dropdown ─── */
+.jb-select {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+  min-width: 180px;
+  max-width: 260px;
+  transition: border-color 0.2s;
+}
+.jb-select:focus { border-color: var(--accent-4); }
+.jb-select option {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ─── Now Playing Title ─── */
+.np-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--accent-4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+/* ─── Transport Buttons ─── */
+.jb-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.jb-btn:hover { border-color: var(--accent-1); color: var(--accent-1); }
+
+.jb-practice-btn.active {
+  background: var(--accent-2);
+  color: var(--bg);
+  border-color: var(--accent-2);
+  font-weight: 500;
+}
+.jb-practice-btn.active:hover {
+  border-color: var(--accent-2);
+  color: var(--bg);
+  filter: brightness(1.1);
+}
+
+/* ─── Progress Bar (inline in toolbar) ─── */
+.jukebox-progress {
+  flex: 1;
+  min-width: 60px;
+  max-width: 200px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.jukebox-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent-4), var(--accent-1));
+  border-radius: 2px;
+  transition: width 0.3s linear;
+}
+
+/* ─── Practice HUD (in toolbar) ─── */
+.practice-hud {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0.6rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 100%;
+  margin-top: 0.2rem;
+}
+.practice-hud.visible {
+  display: flex;
+}
+
+.practice-status {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.practice-note {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text);
+  min-width: 40px;
+}
+.practice-note.listening { color: var(--accent-4); }
+.practice-note.correct   { color: var(--accent-2); }
+.practice-note.wrong     { color: var(--accent-1); }
+
+.practice-progress {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  color: var(--text-dim);
+}
+
+/* ─── Panel Toggle Buttons ─── */
+.panel-toggle {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  padding: 0.25rem 0.6rem;
+  background: var(--bg);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.panel-toggle:hover { border-color: var(--accent-4); color: var(--text); }
+.panel-toggle.active {
+  background: var(--accent-4);
+  color: var(--bg);
+  border-color: var(--accent-4);
+}
+
+/* ─── Panel Area (spacer) ─── */
+.panel-area {
+  margin: 0 1.5rem;
+  min-height: 480px;
+  pointer-events: none;
+}
+
+/* ─── ModalPanel Styles ─── */
+.mp-panel {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.3);
+  overflow: hidden;
+  transition: box-shadow .15s;
+}
+
+.mp-title-bar {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 10px;
+  background: rgba(255,255,255,.03);
+  border-bottom: 1px solid var(--border);
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+}
+.mp-title-bar:active { cursor: grabbing; }
+
+.mp-title-label {
+  flex: 1;
+  font-family: 'Syne', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-close {
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-dim);
+  padding: 0 2px;
+  transition: color .12s;
+}
+.mp-close:hover { color: var(--accent-1); }
+
+.mp-body {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 10px;
+}
+
+/* Resize handles */
+:root { --handle: 6px; }
+.mp-handle { position: absolute; }
+.mp-handle-n  { top:0;    left:var(--handle); right:var(--handle); height:var(--handle); }
+.mp-handle-s  { bottom:0; left:var(--handle); right:var(--handle); height:var(--handle); }
+.mp-handle-e  { right:0;  top:var(--handle);  bottom:var(--handle); width:var(--handle); }
+.mp-handle-w  { left:0;   top:var(--handle);  bottom:var(--handle); width:var(--handle); }
+.mp-handle-ne { top:0;    right:0;  width:var(--handle); height:var(--handle); }
+.mp-handle-nw { top:0;    left:0;   width:var(--handle); height:var(--handle); }
+.mp-handle-se { bottom:0; right:0;  width:var(--handle); height:var(--handle); }
+.mp-handle-sw { bottom:0; left:0;   width:var(--handle); height:var(--handle); }
+
+body.mp-dragging  { cursor: grabbing !important; user-select: none; }
+body.mp-resizing  { user-select: none; }
+
+/* ─── Fretboard Panel Content ─── */
+.fb-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.4rem;
+}
+
+.octave-control {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.octave-control label {
+  font-size: 0.55rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.oct-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.oct-btn:hover { border-color: var(--accent-4); color: var(--accent-4); }
+
+.oct-value {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--accent-4);
+  min-width: 20px;
+  text-align: center;
+}
+
+/* ─── Fretboard Range Controls ─── */
+.fb-range-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-bottom: 0.4rem;
+}
+
+.fb-range-group {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.fb-range-group label {
+  font-size: 0.55rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  width: 40px;
+}
+
+.fb-range-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  width: 42px;
+  padding: 0.25rem 0.3rem;
+  border-radius: 5px;
+  outline: none;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+.fb-range-input:focus { border-color: var(--accent-4); }
+
+.fb-range-sep {
+  color: var(--text-dim);
+  font-size: 0.65rem;
+}
+
+/* ─── Note HUD ─── */
+.note-hud {
+  margin-top: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  min-height: 1.6rem;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  font-family: 'DM Mono', monospace;
+}
+.note-hud:empty { display: none; }
+
+.hud-now {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: var(--accent-4);
+  line-height: 1;
+}
+.hud-next {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--accent-2);
+  line-height: 1;
+}
+.hud-pos {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+}
+.hud-arrow {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  margin: 0 0.2rem;
+}
+
+/* ─── Melody Editor Panel Content ─── */
+.editor-desc {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-bottom: 0.6rem;
+}
+.editor-desc code {
+  background: var(--bg);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  color: var(--accent-4);
+}
+
+.editor-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-bottom: 0.5rem;
+}
+
+.editor-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.editor-row label {
+  font-size: 0.55rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  width: 36px;
+}
+
+.editor-row input[type="text"],
+.editor-row input[type="number"] {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 5px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.editor-row input[type="text"] { width: 130px; }
+.editor-row input[type="number"] { width: 60px; }
+.editor-row input:focus { border-color: var(--accent-4); }
+
+.wave-select {
+  display: flex;
+  gap: 0;
+}
+.wave-select button {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--bg);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+.wave-select button:first-child { border-radius: 4px 0 0 4px; }
+.wave-select button:last-child  { border-radius: 0 4px 4px 0; }
+.wave-select button:not(:first-child) { border-left: none; }
+.wave-select button.active {
+  background: var(--accent-3);
+  color: var(--bg);
+  border-color: var(--accent-3);
+}
+
+.editor-textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  padding: 0.6rem;
+  border-radius: 6px;
+  outline: none;
+  resize: vertical;
+  line-height: 1.5;
+  transition: border-color 0.2s;
+  min-height: 60px;
+}
+.editor-textarea:focus { border-color: var(--accent-4); }
+
+.editor-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 600px) {
+  .jb-toolbar { margin: 0 0.5rem 0.5rem; gap: 0.3rem; }
+  .panel-area { margin: 0 0.5rem; }
+  .jb-select { min-width: 140px; }
+}
