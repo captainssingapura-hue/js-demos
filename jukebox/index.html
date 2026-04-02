@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>8-Bit Jukebox — Web Audio Demo</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="grain"></div>
+
+  <header>
+    <h1>8-Bit Jukebox</h1>
+    <span class="tag">Web Audio Demo</span>
+  </header>
+
+  <!-- Toolbar — always visible above panels -->
+  <div class="jb-toolbar" id="jbToolbar">
+    <!-- Track selector -->
+    <select class="jb-select" id="trackSelect">
+      <option value="-1" disabled selected>Choose a track…</option>
+    </select>
+
+    <!-- Transport controls -->
+    <button class="jb-btn" id="jbPlay" title="Play selected track">▸ Play</button>
+    <button class="jb-btn" id="jbPause" title="Pause / Resume">❚❚</button>
+    <button class="jb-btn" id="jbStop" title="Stop">◼</button>
+    <button class="jb-btn jb-practice-btn" id="jbPractice" title="Practice mode">🎸 Practice</button>
+
+    <span class="np-title" id="npTitle">—</span>
+
+    <div class="jukebox-progress">
+      <div class="jukebox-progress-bar" id="jbProgress"></div>
+    </div>
+
+    <!-- Practice HUD (hidden until practice mode) -->
+    <div class="practice-hud" id="practiceHud">
+      <div class="practice-status" id="practiceStatus"></div>
+      <div class="practice-note" id="practiceNote"></div>
+      <div class="practice-progress" id="practiceProgress"></div>
+    </div>
+
+    <!-- Panel toggles -->
+    <div class="toolbar-sep"></div>
+    <button class="panel-toggle active" data-panel="fretboard" id="togFretboard">Fretboard</button>
+    <button class="panel-toggle active" data-panel="pitchroll" id="togPitchRoll">Pitch Roll</button>
+    <button class="panel-toggle active" data-panel="editor"    id="togEditor">Editor</button>
+    <button class="panel-toggle" id="resetLayout">Reset Layout</button>
+  </div>
+
+  <!-- Spacer — panels float on document.body -->
+  <div class="panel-area" id="panelArea"></div>
+
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <span id="statusText">Ready — click anywhere to enable audio</span>
+  </div>
+
+  <script type="module" src="app.js"></script>
+
+</body>
+</html>

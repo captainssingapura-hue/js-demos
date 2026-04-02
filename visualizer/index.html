@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audio Visualizer — Web Audio Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="grain"></div>
+
+  <header>
+    <h1>Audio Visualizer</h1>
+    <span class="tag">Waveform &bull; Pitch &bull; Spectrum</span>
+  </header>
+
+  <!-- Toolbar — always visible -->
+  <div class="viz-toolbar" id="vizToolbar">
+    <button class="viz-btn" id="vizToggle">Start Mic</button>
+    <div class="level-meter">
+      <div class="level-bar" id="levelBar"></div>
+    </div>
+    <span class="level-label" id="levelLabel">—</span>
+    <div class="toolbar-sep"></div>
+    <button class="panel-toggle active" data-panel="pitch"    id="togPitch">Pitch</button>
+    <button class="panel-toggle active" data-panel="waveform" id="togWave">Waveform</button>
+    <button class="panel-toggle active" data-panel="spectrum" id="togSpec">Spectrum</button>
+    <button class="panel-toggle active" data-panel="scroll"   id="togScroll">Pitch Scroll</button>
+    <button class="panel-toggle" id="resetLayout">Reset Layout</button>
+  </div>
+
+  <!-- Panels mount into this area -->
+  <div class="panel-area" id="panelArea"></div>
+
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <span id="statusText">Ready</span>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

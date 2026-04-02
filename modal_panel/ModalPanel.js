@@ -6,6 +6,9 @@
  * For framework integration or custom stacking, import ModalControl and
  * PanelManager separately instead.
  *
+ * Important: always use `document.body` as the container. Mounting panels
+ * inside an offset container will break drag positioning — see ModalControl.js.
+ *
  * Usage (unchanged from before the split):
  *   import ModalPanel from './ModalPanel.js';
  *

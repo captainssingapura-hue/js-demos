@@ -7,11 +7,22 @@
  * z-index stacking.  Use PanelManager for multi-panel orchestration, or
  * wire the onFocus hook into your own framework.
  *
+ * ## Container constraint
+ *
+ * The drag and resize logic converts mouse `clientX`/`clientY` directly into
+ * CSS `left`/`top` on the panel element.  This means the panel's positioned
+ * parent must have its origin at the viewport origin (i.e. no offset from the
+ * page edge).  In practice, **always use `document.body`** as the container.
+ *
+ * If you mount panels inside a nested `<div>` with margin, padding, or its
+ * own offset, the drag coordinates will be wrong — the panel will jump on
+ * first move by the container's offset amount.
+ *
  * Usage:
  *   import ModalControl from './ModalControl.js';
  *
  *   const panel = new ModalControl({
- *     container : document.body,
+ *     container : document.body,   // ← always use document.body
  *     title     : 'My Panel',
  *     content   : someElement,
  *     x: 100, y: 80, width: 420, height: 300,

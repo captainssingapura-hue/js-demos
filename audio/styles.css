@@ -1,0 +1,155 @@
+@import '../shared/audio/styles.css';
+
+/* ─── Sonic Playground — styles.css ─── */
+
+/* ─── Sound Pad Page ─── */
+.pad-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem; margin-top: 1.5rem;
+}
+
+.pad {
+  aspect-ratio: 1;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 0.6rem; cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative; overflow: hidden;
+  user-select: none;
+}
+
+.pad::before {
+  content: ''; position: absolute; inset: 0;
+  border-radius: 14px; opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.pad:hover { border-color: var(--pad-color); transform: translateY(-2px); }
+.pad:hover::before { opacity: 1; }
+.pad:active { transform: scale(0.96); }
+
+.pad.playing {
+  border-color: var(--pad-color);
+  box-shadow: 0 0 30px var(--pad-glow), inset 0 0 30px var(--pad-glow);
+}
+.pad.playing::before { opacity: 1; }
+
+.pad .icon { font-size: 2rem; z-index: 1; }
+.pad .label {
+  font-size: 0.7rem; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.1em; z-index: 1;
+}
+.pad .key-hint {
+  position: absolute; top: 8px; right: 10px;
+  font-size: 0.6rem; color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 1px 5px; opacity: 0.6;
+}
+
+/* ─── Mixer Page ─── */
+.mixer-section { margin-top: 1.5rem; }
+
+.mixer-channel {
+  display: flex; align-items: center; gap: 1.2rem;
+  padding: 1rem 1.4rem; margin-bottom: 0.75rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; transition: border-color 0.2s;
+}
+.mixer-channel:hover { border-color: #3a3a4a; }
+
+.ch-name {
+  width: 90px; font-size: 0.75rem;
+  color: var(--text); font-weight: 500;
+}
+
+.ch-controls { flex: 1; display: flex; align-items: center; gap: 1.2rem; }
+
+.slider-group { flex: 1; display: flex; flex-direction: column; gap: 0.25rem; }
+.slider-group label {
+  font-size: 0.6rem; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+
+input[type="range"] {
+  -webkit-appearance: none; width: 100%; height: 4px;
+  background: var(--border); border-radius: 2px; outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px;
+  background: var(--accent-2); border-radius: 50%; cursor: pointer;
+  transition: box-shadow 0.2s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 10px var(--glow-2);
+}
+
+.ch-play-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--text); width: 36px; height: 36px;
+  border-radius: 50%; cursor: pointer; font-size: 0.9rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.ch-play-btn:hover { border-color: var(--accent-2); color: var(--accent-2); }
+
+/* ─── Synth Page ─── */
+.synth-container { margin-top: 1.5rem; }
+
+.keyboard {
+  display: flex; gap: 3px; padding: 1rem 0;
+  overflow-x: auto;
+}
+
+.key-white, .key-black {
+  cursor: pointer; border-radius: 0 0 8px 8px;
+  transition: all 0.1s; display: flex;
+  align-items: flex-end; justify-content: center;
+  padding-bottom: 10px; font-size: 0.55rem;
+  color: var(--text-dim); user-select: none;
+}
+
+.key-white {
+  width: 52px; height: 160px;
+  background: linear-gradient(180deg, #e0e0e8, #ccccd8);
+  border: 1px solid #aaa;
+}
+.key-white:hover { background: linear-gradient(180deg, #f0f0f8, #dddde8); }
+.key-white:active, .key-white.active {
+  background: linear-gradient(180deg, var(--accent-3), #8b6ff0);
+  color: white;
+}
+
+.key-black {
+  width: 34px; height: 100px; margin: 0 -17px;
+  background: linear-gradient(180deg, #1a1a26, #0a0a0f);
+  border: 1px solid #333; z-index: 2;
+}
+.key-black:hover { background: linear-gradient(180deg, #2a2a36, #1a1a26); }
+.key-black:active, .key-black.active {
+  background: linear-gradient(180deg, var(--accent-5), #d44090);
+  color: white;
+}
+
+/* ─── Visualizer ─── */
+.visualizer-container {
+  margin-top: 1.5rem; padding: 1rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; height: 120px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+canvas#waveform {
+  width: 100%; height: 100%; display: block;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 600px) {
+  .pad-grid { grid-template-columns: repeat(3, 1fr); }
+  .keyboard { gap: 2px; }
+  .key-white { width: 38px; height: 120px; }
+  .key-black { width: 24px; height: 75px; margin: 0 -12px; }
+}
